@@ -1,0 +1,16 @@
+version: "3.9"
+
+services:
+ loty_psql:
+    image: postgres
+    container_name: loty_psql
+    environment:
+      POSTGRES_PASSWORD: dowodca
+    ports:
+      - 5432:5432
+    volumes:
+      - postgres_dane_loty:/var/lib/postgresql/data/
+      - ./skrypty/init.sql:/docker-entrypoint-initdb.d/init.sql
+   
+volumes:
+ postgres_dane_loty:
