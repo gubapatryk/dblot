@@ -1,0 +1,14 @@
+\COPY raporty.modele_maszyn TO '/csv/modele_maszyn.csv' WITH CSV HEADER;
+\COPY raporty.instytucje_szkoleniowe TO '/csv/instytucje_szkoleniowe.csv' WITH CSV HEADER;
+\COPY raporty.instytucje_medyczne TO '/csv/instytucje_medyczne.csv' WITH CSV HEADER;
+\COPY raporty.kategoria_lotow TO '/csv/kategoria_lotow.csv' WITH CSV HEADER;
+\COPY raporty.maszyny TO '/csv/maszyny.csv' WITH CSV HEADER;
+\COPY raporty.zespoly TO '/csv/zespoly.csv' WITH CSV HEADER;
+\COPY raporty.pracownicy TO '/csv/pracownicy.csv' WITH CSV HEADER;
+\COPY raporty.kierownicy TO '/csv/kierownicy.csv' WITH CSV HEADER;
+\COPY raporty.przeglady TO '/csv/przeglady.csv' WITH CSV HEADER;
+\COPY raporty.szkolenia TO '/csv/szkolenia.csv' WITH CSV HEADER;
+\COPY raporty.badania TO '/csv/badania.csv' WITH CSV HEADER;
+\COPY raporty.lotniska TO '/csv/lotniska.csv' WITH CSV HEADER;
+\COPY raporty.hangary TO '/csv/hangary.csv' WITH CSV HEADER;
+\COPY raporty.loty TO '/csv/loty.csv' WITH CSV HEADER;

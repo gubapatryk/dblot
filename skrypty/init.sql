@@ -118,4 +118,20 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE raporty.pracownicy TO dowodca;
 CREATE USER andrzej WITH PASSWORD 'andrzej';
 GRANT dowodca TO andrzej;
 
-\COPY raporty.zespoly(nazwa) FROM '/csv/zespoly.csv' DELIMITER ',' CSV HEADER;
+--\COPY raporty.zespoly(nazwa) FROM '/csv/zespoly.csv' DELIMITER ',' CSV HEADER;
+--\COPY raporty.pracownicy(id,zespol,imie,nazwisko,data_zatrudnienia,data_zakonczenia) FROM '/csv/pracownicy.csv' WITH DELIMITER AS ',' NULL as 'null' CSV HEADER;
+
+COPY raporty.modele_maszyn FROM '/csv/modele_maszyn.csv' DELIMITER ',' CSV HEADER;
+COPY raporty.instytucje_szkoleniowe FROM '/csv/instytucje_szkoleniowe.csv' DELIMITER ',' CSV HEADER;
+COPY raporty.instytucje_medyczne FROM '/csv/instytucje_medyczne.csv' DELIMITER ',' CSV HEADER;
+COPY raporty.kategoria_lotow FROM '/csv/kategoria_lotow.csv' DELIMITER ',' CSV HEADER;
+COPY raporty.maszyny FROM '/csv/maszyny.csv' DELIMITER ',' CSV HEADER;
+COPY raporty.zespoly FROM '/csv/zespoly.csv' DELIMITER ',' CSV HEADER;
+COPY raporty.pracownicy FROM '/csv/pracownicy.csv'  WITH (FORMAT CSV, DELIMITER ',', NULL 'null', HEADER);
+COPY raporty.kierownicy FROM '/csv/kierownicy.csv' DELIMITER ',' CSV HEADER;
+COPY raporty.przeglady FROM '/csv/przeglady.csv' DELIMITER ',' CSV HEADER;
+COPY raporty.szkolenia FROM '/csv/szkolenia.csv' DELIMITER ',' CSV HEADER;
+COPY raporty.badania FROM '/csv/badania.csv' DELIMITER ',' CSV HEADER;
+COPY raporty.lotniska FROM '/csv/lotniska.csv' DELIMITER ',' CSV HEADER;
+COPY raporty.hangary FROM '/csv/hangary.csv' DELIMITER ',' CSV HEADER;
+COPY raporty.loty FROM '/csv/loty.csv' DELIMITER ',' CSV HEADER;
