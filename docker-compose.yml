@@ -12,6 +12,7 @@ services:
       - postgres_dane_loty:/var/lib/postgresql/data/
       - ./skrypty/init.sql:/docker-entrypoint-initdb.d/init.sql
       - ./csv:/csv
+      - ./csv2:/csv2
    
 volumes:
  postgres_dane_loty:
