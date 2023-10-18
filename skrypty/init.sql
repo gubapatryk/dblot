@@ -118,6 +118,18 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE raporty.pracownicy TO dowodca;
 CREATE USER andrzej WITH PASSWORD 'andrzej';
 GRANT dowodca TO andrzej;
 
+
+CREATE ROLE kierownik;
+GRANT CONNECT ON DATABASE jednostka TO kierownik;
+GRANT USAGE on SCHEMA raporty TO kierownik;
+GRANT SELECT ON ALL TABLES IN SCHEMA raporty TO kierownik;
+REVOKE SELECT ON TABLE raporty.przeglady FROM kierownik;
+
+CREATE USER jan WITH PASSWORD 'jan';
+GRANT kierownik TO jan;
+
+
+
 COPY raporty.modele_maszyn FROM '/csv/modele_maszyn.csv' WITH (FORMAT CSV, DELIMITER ',', NULL 'null', HEADER);
 COPY raporty.instytucje_szkoleniowe FROM '/csv/instytucje_szkoleniowe.csv' WITH (FORMAT CSV, DELIMITER ',', NULL 'null', HEADER);
 COPY raporty.instytucje_medyczne FROM '/csv/instytucje_medyczne.csv' WITH (FORMAT CSV, DELIMITER ',', NULL 'null', HEADER);
