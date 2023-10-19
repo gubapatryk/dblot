@@ -1,6 +1,6 @@
 id,id_zespolu,imie,nazwisko,data_rozpoczecia,data_zakonczenia
 1,1,Jan,Kowalski,2023-10-01,null
-2,2,Aleksander,Wojciechowski,2016-01-01,null
+2,2,Max,Wojciechowski,2016-01-01,null
 3,1,Remigiusz,Stępień,2017-11-01,null
 4,2,Franciszek,Sikorski,2013-03-01,null
 5,3,Grzegorz,Jaworski,2010-12-01,null

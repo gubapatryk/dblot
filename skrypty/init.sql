@@ -52,8 +52,8 @@ CREATE TABLE raporty.pracownicy (
 CREATE TABLE raporty.kierownicy (
     id_zespolu INT REFERENCES raporty.zespoly(id),
     id_pracownika INT REFERENCES raporty.pracownicy(id),
-    data_rozpoczecia DATE NOT NULL,
-    data_zakonczenia DATE
+    rozpoczecie DATE NOT NULL,
+    zakonczenie DATE
 );
 
 
@@ -113,7 +113,7 @@ CREATE ROLE dowodca;
 GRANT ALL PRIVILEGES ON DATABASE jednostka TO dowodca;
 GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA raporty TO dowodca;
 GRANT USAGE on SCHEMA raporty TO dowodca;
-GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE raporty.pracownicy TO dowodca;
+-- GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE raporty.pracownicy TO dowodca;
 
 CREATE USER andrzej WITH PASSWORD 'andrzej';
 GRANT dowodca TO andrzej;
@@ -123,12 +123,24 @@ CREATE ROLE kierownik;
 GRANT CONNECT ON DATABASE jednostka TO kierownik;
 GRANT USAGE on SCHEMA raporty TO kierownik;
 GRANT SELECT ON ALL TABLES IN SCHEMA raporty TO kierownik;
-REVOKE SELECT ON TABLE raporty.przeglady FROM kierownik;
+GRANT INSERT, UPDATE, DELETE ON TABLE raporty.loty TO kierownik;
+GRANT INSERT, UPDATE, DELETE ON TABLE raporty.pracownicy TO pilot;
+GRANT INSERT, UPDATE, DELETE ON TABLE raporty.badania TO pilot;
+GRANT INSERT, UPDATE, DELETE ON TABLE raporty.szkolenia TO pilot;
+GRANT INSERT, UPDATE, DELETE ON TABLE raporty.instytucje_medyczne TO pilot;
+GRANT INSERT, UPDATE, DELETE ON TABLE raporty.instytucje_szkoleniowe TO pilot;
 
 CREATE USER jan WITH PASSWORD 'jan';
 GRANT kierownik TO jan;
 
+CREATE ROLE pilot;
+GRANT CONNECT ON DATABASE jednostka TO pilot;
+GRANT USAGE on SCHEMA raporty TO pilot;
+GRANT SELECT ON ALL TABLES IN SCHEMA raporty TO pilot;
+GRANT INSERT, UPDATE, DELETE ON TABLE raporty.loty TO pilot;
 
+CREATE USER maks WITH PASSWORD 'maks';
+GRANT pilot TO maks;
 
 COPY raporty.modele_maszyn FROM '/csv/modele_maszyn.csv' WITH (FORMAT CSV, DELIMITER ',', NULL 'null', HEADER);
 COPY raporty.instytucje_szkoleniowe FROM '/csv/instytucje_szkoleniowe.csv' WITH (FORMAT CSV, DELIMITER ',', NULL 'null', HEADER);

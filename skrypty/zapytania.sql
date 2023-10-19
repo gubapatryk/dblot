@@ -74,3 +74,23 @@ GROUP BY
     m.rejestracja
 ORDER BY
     m.rejestracja;
+
+-- podzapytanie - piloci którzy mieli badanie w instytucji o danej nazwie
+
+SELECT id, imie, nazwisko
+FROM raporty.pracownicy
+WHERE id IN (
+    SELECT id_pracownika
+    FROM raporty.badania
+    WHERE id_instytucji IN (
+        SELECT id
+        FROM raporty.instytucje_medyczne
+        WHERE nazwa = 'Wojskowy Instytut Medycyny Lotniczej'
+    )
+);
+
+-- podzapytanie - loty w których uczestniczył co najmniej jeden kierownik zespołu
+SELECT * FROM raporty.loty
+WHERE pilot1 IN (SELECT id_pracownika FROM raporty.kierownicy WHERE zakonczenie IS NULL) 
+    OR pilot2 IN (SELECT id_pracownika FROM raporty.kierownicy WHERE zakonczenie IS NULL) 
+    OR (pilot1 IN (SELECT id_pracownika FROM raporty.kierownicy WHERE zakonczenie IS NULL) AND pilot2 IS NULL);
