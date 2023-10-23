@@ -124,11 +124,11 @@ GRANT CONNECT ON DATABASE jednostka TO kierownik;
 GRANT USAGE on SCHEMA raporty TO kierownik;
 GRANT SELECT ON ALL TABLES IN SCHEMA raporty TO kierownik;
 GRANT INSERT, UPDATE, DELETE ON TABLE raporty.loty TO kierownik;
-GRANT INSERT, UPDATE, DELETE ON TABLE raporty.pracownicy TO pilot;
-GRANT INSERT, UPDATE, DELETE ON TABLE raporty.badania TO pilot;
-GRANT INSERT, UPDATE, DELETE ON TABLE raporty.szkolenia TO pilot;
-GRANT INSERT, UPDATE, DELETE ON TABLE raporty.instytucje_medyczne TO pilot;
-GRANT INSERT, UPDATE, DELETE ON TABLE raporty.instytucje_szkoleniowe TO pilot;
+GRANT INSERT, UPDATE, DELETE ON TABLE raporty.pracownicy TO kierownik;
+GRANT INSERT, UPDATE, DELETE ON TABLE raporty.badania TO kierownik;
+GRANT INSERT, UPDATE, DELETE ON TABLE raporty.szkolenia TO kierownik;
+GRANT INSERT, UPDATE, DELETE ON TABLE raporty.instytucje_medyczne TO kierownik;
+GRANT INSERT, UPDATE, DELETE ON TABLE raporty.instytucje_szkoleniowe TO kierownik;
 
 CREATE USER jan WITH PASSWORD 'jan';
 GRANT kierownik TO jan;
