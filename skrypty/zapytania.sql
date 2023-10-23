@@ -94,3 +94,70 @@ SELECT * FROM raporty.loty
 WHERE pilot1 IN (SELECT id_pracownika FROM raporty.kierownicy WHERE zakonczenie IS NULL) 
     OR pilot2 IN (SELECT id_pracownika FROM raporty.kierownicy WHERE zakonczenie IS NULL) 
     OR (pilot1 IN (SELECT id_pracownika FROM raporty.kierownicy WHERE zakonczenie IS NULL) AND pilot2 IS NULL);
+
+
+--nalot w miesiącu w godzinach
+SELECT
+    p.id AS id_pilota,
+    p.imie || ' ' || p.nazwisko AS pilot,
+    SUM(EXTRACT(EPOCH FROM (l.godzina_ladowania - l.godzina_wylotu))) / 3600 AS suma_czasu_lotu_minuty
+FROM
+    raporty.pracownicy p
+LEFT JOIN
+    raporty.loty l ON p.id IN (l.pilot1, l.pilot2)
+WHERE
+    EXTRACT(MONTH FROM l.godzina_ladowania) = EXTRACT(MONTH FROM CURRENT_DATE) AND  EXTRACT(YEAR FROM l.godzina_ladowania) = EXTRACT(YEAR FROM CURRENT_DATE)
+GROUP BY
+    p.id, p.imie, p.nazwisko
+ORDER BY
+    suma_czasu_lotu_minuty DESC;
+
+-- ile wylatano w tym tygodniu
+SELECT
+    p.id AS id_pilota,
+    p.imie || ' ' || p.nazwisko AS pilot,
+    SUM(EXTRACT(EPOCH FROM (l.godzina_ladowania - l.godzina_wylotu))) / 3600 AS suma_czasu_lotu_minuty
+FROM
+    raporty.pracownicy p
+LEFT JOIN
+    raporty.loty l ON p.id IN (l.pilot1, l.pilot2)
+WHERE
+    EXTRACT('week' FROM l.godzina_ladowania) = EXTRACT('week' FROM CURRENT_DATE) AND  EXTRACT(YEAR FROM l.godzina_ladowania) = EXTRACT(YEAR FROM CURRENT_DATE)
+GROUP BY
+    p.id, p.imie, p.nazwisko
+ORDER BY
+    suma_czasu_lotu_minuty DESC;
+
+-- kto ma wazne badania lekarskie
+
+SELECT
+    p.id AS id_pracownika,
+    p.imie,
+    p.nazwisko,
+    CASE
+        WHEN EXISTS (
+            SELECT 1
+            FROM raporty.badania b
+            WHERE p.id = b.id_pracownika
+              AND b.data_waznosci >= CURRENT_DATE
+        ) THEN 'tak'
+        ELSE 'nie'
+    END AS czy_badania_wazne
+FROM
+    raporty.pracownicy p;
+
+
+-- raporty przegladow maszyn
+SELECT
+    m.rejestracja AS numer_rejestracyjny,
+    CASE
+        WHEN EXISTS (
+            SELECT 1
+            FROM raporty.przeglady p
+            WHERE m.rejestracja = p.rejestracja
+              AND p.data_waznosci >= CURRENT_DATE
+        ) THEN 'tak'
+        ELSE 'nie'
+    END AS czy_przeglad_wazny
+FROM
+    raporty.maszyny m;

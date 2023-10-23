@@ -174,3 +174,12 @@ COPY raporty.loty FROM '/csv/loty.csv' WITH (FORMAT CSV, DELIMITER ',', NULL 'nu
 --\COPY raporty.lotniska TO '/csv2/lotniska.csv' WITH CSV HEADER;
 --\COPY raporty.hangary TO '/csv2/hangary.csv' WITH CSV HEADER;
 --\COPY raporty.loty TO '/csv2/loty.csv' WITH CSV HEADER;
+
+CREATE VIEW raporty.moj_widok AS
+SELECT
+    id,
+    nazwa
+FROM
+    raporty.instytucje_szkoleniowe;
+
+GRANT SELECT ON raporty.moj_widok TO dowodca;
