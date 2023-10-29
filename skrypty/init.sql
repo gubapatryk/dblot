@@ -112,6 +112,19 @@ CREATE TABLE raporty.loty (
 );
 
 
+
+-- tabela systemowa do przechowywania relacji między użytkownikiem bazy danych a id pracownika dla widoków
+CREATE TABLE raporty.sys_user_prac (
+    username VARCHAR(20) NOT NULL,
+    id_prac INT NOT NULL
+);
+
+INSERT INTO raporty.sys_user_prac (username, id_prac)
+VALUES
+  ('maks', 2),
+  ('remigiusz', 3),
+  ('andrzej', 7);
+
 CREATE ROLE dowodca;
 GRANT ALL PRIVILEGES ON DATABASE jednostka TO dowodca;
 GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA raporty TO dowodca;
@@ -134,8 +147,8 @@ GRANT INSERT, UPDATE, DELETE ON TABLE raporty.szkolenia TO kierownik;
 GRANT INSERT, UPDATE, DELETE ON TABLE raporty.instytucje_medyczne TO kierownik;
 GRANT INSERT, UPDATE, DELETE ON TABLE raporty.instytucje_szkoleniowe TO kierownik;
 
-CREATE USER jan WITH PASSWORD 'jan';
-GRANT kierownik TO jan;
+CREATE USER remigiusz WITH PASSWORD 'remigiusz';
+GRANT kierownik TO remigiusz;
 
 CREATE ROLE pilot;
 GRANT CONNECT ON DATABASE jednostka TO pilot;
@@ -179,11 +192,155 @@ COPY raporty.loty FROM '/csv/loty.csv' WITH (FORMAT CSV, DELIMITER ',', NULL 'nu
 --\COPY raporty.hangary TO '/csv2/hangary.csv' WITH CSV HEADER;
 --\COPY raporty.loty TO '/csv2/loty.csv' WITH CSV HEADER;
 
-CREATE VIEW raporty.moj_widok AS
-SELECT
-    id,
-    nazwa
-FROM
-    raporty.instytucje_szkoleniowe;
 
-GRANT SELECT ON raporty.moj_widok TO dowodca;
+
+CREATE VIEW raporty.waznosc_badan_lekarskich AS
+SELECT
+    p.id AS id_pracownika,
+    p.imie,
+    p.nazwisko,
+    CASE
+        WHEN EXISTS (
+            SELECT 1
+            FROM raporty.badania b
+            WHERE p.id = b.id_pracownika
+              AND b.data_waznosci >= CURRENT_DATE
+        ) THEN 'tak'
+        ELSE 'nie'
+    END AS czy_badania_wazne
+FROM
+    raporty.pracownicy p
+WHERE
+    p.data_zakonczenia IS NULL;
+
+GRANT SELECT ON raporty.waznosc_badan_lekarskich TO dowodca;
+
+
+CREATE VIEW raporty.waznosc_szkolen AS
+SELECT
+    p.id AS id_pracownika,
+    p.imie,
+    p.nazwisko,
+    CASE
+        WHEN EXISTS (
+            SELECT 1
+            FROM raporty.badania b
+            WHERE p.id = b.id_pracownika
+              AND b.data_waznosci >= CURRENT_DATE
+        ) THEN 'tak'
+        ELSE 'nie'
+    END AS czy_badania_wazne
+FROM
+    raporty.pracownicy p
+WHERE
+    p.data_zakonczenia IS NULL;
+
+GRANT SELECT ON raporty.waznosc_szkolen TO dowodca;
+
+CREATE VIEW raporty.waznosc_przegladow AS
+SELECT
+    m.rejestracja AS numer_rejestracyjny,
+    CASE
+        WHEN MAX(p.data_waznosci) >= CURRENT_DATE THEN 'Tak'
+        ELSE 'Nie'
+    END AS czy_wazne_przeglady
+FROM
+    raporty.maszyny m
+LEFT JOIN
+    raporty.przeglady p ON m.rejestracja = p.rejestracja
+GROUP BY
+    m.rejestracja
+ORDER BY
+    m.rejestracja;
+
+GRANT SELECT ON raporty.waznosc_przegladow TO dowodca;
+
+CREATE VIEW raporty.raport_miesieczny AS
+SELECT
+    p.id AS id_pilota,
+    p.imie || ' ' || p.nazwisko AS pilot,
+    SUM(EXTRACT(EPOCH FROM (l.godzina_ladowania - l.godzina_wylotu))) / 3600 AS suma_czasu_lotu_minuty
+FROM
+    raporty.pracownicy p
+LEFT JOIN
+    raporty.loty l ON p.id IN (l.pilot1, l.pilot2)
+WHERE
+    EXTRACT(MONTH FROM l.godzina_ladowania) = EXTRACT(MONTH FROM CURRENT_DATE) AND  EXTRACT(YEAR FROM l.godzina_ladowania) = EXTRACT(YEAR FROM CURRENT_DATE) AND p.data_zakonczenia IS NULL
+GROUP BY
+    p.id, p.imie, p.nazwisko
+ORDER BY
+    suma_czasu_lotu_minuty DESC;
+
+GRANT SELECT ON raporty.raport_miesieczny TO dowodca;
+GRANT SELECT ON raporty.raport_miesieczny TO kierownik;
+GRANT SELECT ON raporty.raport_miesieczny TO pilot;
+
+CREATE VIEW raporty.raport_roczny AS
+SELECT
+    p.id AS id_pilota,
+    p.imie || ' ' || p.nazwisko AS pilot,
+    SUM(EXTRACT(EPOCH FROM (l.godzina_ladowania - l.godzina_wylotu))) / 3600 AS suma_czasu_lotu_minuty
+FROM
+    raporty.pracownicy p
+LEFT JOIN
+    raporty.loty l ON p.id IN (l.pilot1, l.pilot2)
+WHERE
+    EXTRACT(YEAR FROM l.godzina_ladowania) = EXTRACT(YEAR FROM CURRENT_DATE) AND p.data_zakonczenia IS NULL
+GROUP BY
+    p.id, p.imie, p.nazwisko
+ORDER BY
+    suma_czasu_lotu_minuty DESC;
+
+GRANT SELECT ON raporty.raport_roczny TO dowodca;
+GRANT SELECT ON raporty.raport_roczny TO kierownik;
+GRANT SELECT ON raporty.raport_roczny TO pilot;
+
+
+CREATE VIEW raporty.raport_miesieczny_user AS
+SELECT
+    p.id AS id_pilota,
+    p.imie || ' ' || p.nazwisko AS pilot,
+    COALESCE(SUM(EXTRACT(EPOCH FROM (l.godzina_ladowania - l.godzina_wylotu))) / 3600,0) AS suma_czasu_lotu_minuty
+FROM
+    raporty.pracownicy p
+LEFT JOIN
+    raporty.loty l ON p.id IN (l.pilot1, l.pilot2)
+WHERE
+    ((EXTRACT(MONTH FROM l.godzina_ladowania) = EXTRACT(MONTH FROM CURRENT_DATE) 
+    AND  EXTRACT(YEAR FROM l.godzina_ladowania) = EXTRACT(YEAR FROM CURRENT_DATE)) OR l.godzina_ladowania IS NULL) 
+    AND p.data_zakonczenia IS NULL
+    AND p.zespol IN (SELECT zespol from raporty.pracownicy p
+JOIN
+    raporty.sys_user_prac s ON p.id = s.id_prac where s.username=current_user)
+GROUP BY
+    p.id, p.imie, p.nazwisko
+ORDER BY
+    suma_czasu_lotu_minuty DESC;
+
+GRANT SELECT ON raporty.raport_miesieczny_user TO dowodca;
+GRANT SELECT ON raporty.raport_miesieczny_user TO kierownik;
+GRANT SELECT ON raporty.raport_miesieczny_user TO pilot;
+
+CREATE VIEW raporty.raport_roczny_user AS
+SELECT
+    p.id AS id_pilota,
+    p.imie || ' ' || p.nazwisko AS pilot,
+    COALESCE(SUM(EXTRACT(EPOCH FROM (l.godzina_ladowania - l.godzina_wylotu))) / 3600,0) AS suma_czasu_lotu_minuty
+FROM
+    raporty.pracownicy p
+LEFT JOIN
+    raporty.loty l ON p.id IN (l.pilot1, l.pilot2)
+WHERE
+    (EXTRACT(YEAR FROM l.godzina_ladowania) = EXTRACT(YEAR FROM CURRENT_DATE) OR l.godzina_ladowania IS NULL) 
+    AND p.data_zakonczenia IS NULL
+    AND p.zespol IN (SELECT zespol from raporty.pracownicy p
+JOIN
+    raporty.sys_user_prac s ON p.id = s.id_prac where s.username=current_user)
+GROUP BY
+    p.id, p.imie, p.nazwisko
+ORDER BY
+    suma_czasu_lotu_minuty DESC;
+
+GRANT SELECT ON raporty.raport_roczny_user TO dowodca;
+GRANT SELECT ON raporty.raport_roczny_user TO kierownik;
+GRANT SELECT ON raporty.raport_roczny_user TO pilot;

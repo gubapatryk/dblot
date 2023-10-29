@@ -1,3 +1,5 @@
+-- UWAGA: nie wszystkie zapytania w tym pliku mogą być aktualne dla obecnego stanu bazy danych bądź poprawne
+
 -- sprawdz ile samolotów jest na każdym z lotnisk i czy to możliwe pod wzgledem pojemności lotnisk
 SELECT
     lotniska.iata AS lotnisko,
@@ -309,3 +311,52 @@ VALUES (16, 1, 1, '2023-10-29', '2024-10-29');
 INSERT 0 1
 
 docker exec -it $(sudo docker ps -aqf "name=loty_psql") psql -d jednostka -U jan
+
+
+SELECT
+    p.id AS id_pracownika,
+    p.imie,
+    p.nazwisko,
+    CASE
+        WHEN s.data_waznosci > CURRENT_DATE THEN 'tak'
+        ELSE 'nie'
+    END AS czy_szkolenie_wazne
+FROM
+    raporty.pracownicy p
+LEFT JOIN (
+    SELECT
+        s.id_pracownika,
+        MAX(s.data_waznosci) AS max_data_waznosci
+    FROM
+        raporty.szkolenia s
+    LEFT JOIN raporty.kierownicy k ON s.id_pracownika = k.id_pracownika
+    WHERE
+        k.id_pracownika IS NULL
+    GROUP BY
+        s.id_pracownika
+) latest_training ON p.id = latest_training.id_pracownika
+LEFT JOIN raporty.szkolenia s ON latest_training.id_pracownika = s.id_pracownika AND latest_training.max_data_waznosci = s.data_waznosci
+WHERE
+    kierownicy.id_pracownika IS NULL OR kierownicy.id_pracownika IS NULL;
+
+
+-- zamiana "nullowej" sumy na nienullowe zero - https://stackoverflow.com/questions/40098273/sql-sum-change-null-with-0
+SELECT
+    p.id AS id_pilota,
+    p.imie || ' ' || p.nazwisko AS pilot,
+    COALESCE(SUM(EXTRACT(EPOCH FROM (l.godzina_ladowania - l.godzina_wylotu))) / 3600,0) AS suma_czasu_lotu_minuty
+FROM
+    raporty.pracownicy p
+LEFT JOIN
+    raporty.loty l ON p.id IN (l.pilot1, l.pilot2)
+WHERE
+    ((EXTRACT(MONTH FROM l.godzina_ladowania) = EXTRACT(MONTH FROM CURRENT_DATE) 
+    AND  EXTRACT(YEAR FROM l.godzina_ladowania) = EXTRACT(YEAR FROM CURRENT_DATE)) OR l.godzina_ladowania IS NULL) 
+    AND p.data_zakonczenia IS NULL
+    AND p.zespol IN (SELECT zespol from raporty.pracownicy p
+JOIN
+    raporty.sys_user_prac s ON p.id = s.id_prac where s.username=current_user)
+GROUP BY
+    p.id, p.imie, p.nazwisko
+ORDER BY
+    suma_czasu_lotu_minuty DESC;
