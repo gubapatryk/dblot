@@ -161,3 +161,44 @@ SELECT
     END AS czy_przeglad_wazny
 FROM
     raporty.maszyny m;
+
+-- insert duzej liczby danych generowanych w serii
+INSERT INTO raporty.pracownicy (id, zespol, imie, nazwisko, data_zatrudnienia, data_zakonczenia)
+SELECT
+    id,
+    1 AS zespol,
+    'Jan' AS imie,
+    'Kowal' AS nazwisko,
+    '2023-01-15' AS data_zatrudnienia,
+    NULL AS data_zakonczenia
+FROM
+    generate_series(7, 100) AS id;
+
+-- i ze zmienna datą
+
+INSERT INTO raporty.pracownicy (id, zespol, imie, nazwisko, data_zatrudnienia, data_zakonczenia)
+SELECT
+    id,
+    1 AS zespol,
+    'Jan' AS imie,
+    'Kowal' AS nazwisko,
+    timestamp '2014-01-10 20:00:00' +                                                                                                                            
+       random() * (timestamp '2023-10-20 20:00:00' -
+                   timestamp '2014-01-10 10:00:00') AS data_zatrudnienia,
+    NULL AS data_zakonczenia
+FROM
+    generate_series(7, 3000) AS id;
+
+-- z indeksami
+INSERT INTO raporty.pracownicy (id, zespol, imie, nazwisko, data_zatrudnienia, data_zakonczenia)
+SELECT
+    id,
+    1 AS zespol,
+    'Jan' AS imie,
+    'Kowal' AS nazwisko,
+    timestamp '2014-01-10 20:00:00' +                                                                                                                            
+       random() * (timestamp '2023-10-20 20:00:00' -
+                   timestamp '2014-01-10 10:00:00') AS data_zatrudnienia,
+    NULL AS data_zakonczenia
+FROM
+    generate_series(8, 3000) AS id;
