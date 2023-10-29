@@ -10,7 +10,7 @@ services:
       - 5432:5432
     volumes:
       - postgres_dane_loty:/var/lib/postgresql/data/
-      - ./skrypty/init-indexless.sql:/docker-entrypoint-initdb.d/init.sql
+      - ./skrypty/init.sql:/docker-entrypoint-initdb.d/init.sql
       - ./csv:/csv
       - ./csv2:/csv2
    

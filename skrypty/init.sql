@@ -57,7 +57,7 @@ CREATE TABLE raporty.kierownicy (
 );
 
 -- Indeks dla obu kolumn
-CREATE INDEX idx_id_zespolu_id_pracownika ON raporty.kierownicy (id_zespolu, id_pracownika);
+CREATE INDEX idx_id_pracownika_id_zespolu ON raporty.kierownicy (id_pracownika, id_zespolu);
 
 
 CREATE TABLE raporty.przeglady (
