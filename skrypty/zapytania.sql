@@ -360,3 +360,41 @@ GROUP BY
     p.id, p.imie, p.nazwisko
 ORDER BY
     suma_czasu_lotu_minuty DESC;
+
+
+
+    
+INSERT INTO raporty.loty (id, pilot1, pilot2, rejestracja, kategoria, lotnisko_wylotu, lotnisko_przylotu, godzina_wylotu, godzina_ladowania)
+SELECT
+    id,
+    1 AS pilot1,
+    NULL AS pilot2,
+    'SP-SRS' AS rejestracja,
+    'IFR' AS kategoria,
+    'WAW' AS lotnisko_wylotu,
+    'EPB' AS lotnisko_przylotu,
+    timestamp '2014-01-10 20:00:00' +                                                                                                                            
+       random() * (timestamp '2023-10-20 20:00:00' -
+                   timestamp '2014-01-10 10:00:00') AS godzina_wylotu,
+    timestamp '2015-01-10 20:00:00' +                                                                                                                            
+       random() * (timestamp '2023-10-20 20:00:00' -
+                   timestamp '2014-01-10 10:00:00') AS godzina_ladowania
+FROM
+    generate_series(28, 30000) AS id;
+
+explain select kategoria from raporty.loty where godzina_ladowania > timestamp '2020-01-01' AND godzina_ladowania < timestamp '2021-01-01' order by godzina_ladowania LIMIT 10;
+
+jednostka=> select kategoria from raporty.loty where godzina_ladowania > timestamp '2020-01-01' AND godzina_ladowania < timestamp '2021-01-01' order by godzina_ladowania LIMIT 10;
+ kategoria 
+-----------
+ IFR
+ IFR
+ IFR
+ IFR
+ IFR
+ IFR
+ IFR
+ IFR
+ IFR
+ IFR
+(10 rows)
