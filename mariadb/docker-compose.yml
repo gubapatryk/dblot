@@ -1,0 +1,17 @@
+version: "3.9"
+
+services:
+  loty_mariadb:
+    image: mariadb
+    environment:
+      MYSQL_ROOT_PASSWORD: dowodca
+      MYSQL_DATABASE: jednostka
+      MYSQL_USER: dowodca
+      MYSQL_PASSWORD: dowodca
+    volumes:
+      - maria_dane_loty:/var/lib/mysql
+    ports:
+      - "3306:3306"
+
+volumes:
+ maria_dane_loty:

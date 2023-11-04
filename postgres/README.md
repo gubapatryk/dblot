@@ -22,3 +22,9 @@ Przyklad importu pliku
 \COPY raporty.pracownicy(id,zespol,imie,nazwisko,data_zatrudnienia,data_zakonczenia) FROM '/csv/pracownicy.csv' DELIMITER ',' CSV HEADER;
 \COPY raporty.modele_maszyn TO '/csv/modele_maszyn.csv' WITH CSV HEADER;
 ```
+
+### Do mariadb
+
+```
+docker exec -it $(sudo docker ps -aqf "name=loty_mariadb") mariadb --user dowodca -pdowodca jednostka
+```

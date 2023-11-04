@@ -60,8 +60,8 @@ CREATE TABLE raporty.kierownicy (
     zakonczenie DATE
 );
 
--- Indeks dla obu kolumn
-CREATE INDEX idx_kierownicy_id_pracownika_id_zespolu ON raporty.kierownicy (id_pracownika, id_zespolu);
+
+
 
 
 CREATE TABLE raporty.przeglady (
