@@ -369,6 +369,12 @@ GRANT SELECT ON raporty.raport_roczny_zespol TO pilot;
 SELECT setval(pg_get_serial_sequence('raporty.pracownicy', 'id'), coalesce(MAX(id), 1))
 from raporty.pracownicy;
 
+SELECT setval(pg_get_serial_sequence('raporty.szkolenia', 'id'), coalesce(MAX(id), 1))
+from raporty.szkolenia;
+
+SELECT setval(pg_get_serial_sequence('raporty.loty', 'id'), coalesce(MAX(id), 1))
+from raporty.loty;
+
 CREATE OR REPLACE PROCEDURE raporty.dodaj_pracownika(
     p_zespol INT,
     p_imie VARCHAR(60),
@@ -460,11 +466,12 @@ DECLARE
     v_kierownik INT;
 BEGIN
     -- Sprawdź, czy spośród pilotów znajduje się pilot będący kierownikiem
+    -- Zalozenie systemowe - szkoleniowca podajemy jako pierwszego, a szkolonego jako drugiego pilota 
     SELECT id_pracownika INTO v_kierownik
     FROM raporty.kierownicy
-    WHERE id_pracownika IN (p_pilot1, p_pilot2)
+    WHERE id_pracownika = p_pilot1
       AND rozpoczecie <= CURRENT_TIMESTAMP
-      AND (zakonczenie IS NULL OR zakonczenie > CURRENT_TIMESTAMP);
+      AND zakonczenie IS NULL;
 
     IF v_kierownik IS NULL THEN
         RAISE EXCEPTION 'Żaden z pilotów nie jest kierownikiem';
@@ -477,7 +484,7 @@ BEGIN
         WHERE id_pracownika IN (p_pilot1, p_pilot2)
           AND data_waznosci >= CURRENT_DATE
     ) THEN
-        RAISE EXCEPTION 'Pilot(y) nie ma/mają aktualnych badań lekarskich';
+        RAISE EXCEPTION 'Co najmniej jeden z pilotów nie ma aktualnych badań lekarskich';
     END IF;
 
     -- Sprawdź, czy w tym momencie nie uczestniczyli już w innym locie
@@ -487,10 +494,10 @@ BEGIN
         WHERE (p_pilot1 IN (pilot1, pilot2) OR p_pilot2 IN (pilot1, pilot2))
           AND (p_godzina_wylotu, p_godzina_ladowania) OVERLAPS (godzina_wylotu, godzina_ladowania)
     ) THEN
-        RAISE EXCEPTION 'Pilot(y) uczestniczą już w innym locie w tym czasie';
+        RAISE EXCEPTION 'Piloci o podanych numerach ID uczestniczą już w innym locie w tym czasie';
     END IF;
 
-    -- Sprawdź, czy pojazd o podanej rejestracji nie był już w innym locie
+    -- Sprawdz, czy pojazd o podanej rejestracji nie byl juz w innym locie
     IF EXISTS (
         SELECT 1
         FROM raporty.loty
@@ -501,8 +508,9 @@ BEGIN
     END IF;
 
     -- Dodaj rekord do tabeli raporty.szkolenia
-    INSERT INTO raporty.szkolenia (id_pracownika, nazwa, data_aktualizacji, data_waznosci)
-    VALUES (v_kierownik, 'Lot szkoleniowy', CURRENT_DATE, CURRENT_DATE + INTERVAL '1 year');
+    -- id_instytucji=1, bo szkolenie wewnetrzne (regula biznesowa)
+    INSERT INTO raporty.szkolenia (id_instytucji, id_pracownika, nazwa, data_aktualizacji, data_waznosci)
+    VALUES (1, p_pilot2, 'Lot szkoleniowy', p_godzina_wylotu, p_godzina_ladowania + INTERVAL '1 year');
 
     -- Dodaj rekord do tabeli raporty.loty
     INSERT INTO raporty.loty (pilot1, pilot2, rejestracja, kategoria, lotnisko_wylotu, lotnisko_przylotu, godzina_wylotu, godzina_ladowania)
@@ -510,6 +518,52 @@ BEGIN
 END;
 $$
 LANGUAGE plpgsql;
+
+
+-- sprawdzanie limitu nalotu w tygodniu wyzwalaczem
+
+
+CREATE OR REPLACE FUNCTION sprawdz_nalot()
+RETURNS TRIGGER AS $$
+DECLARE
+    pilot1_nalot INT;
+    pilot2_nalot INT;
+BEGIN
+    -- Pobierz tygodniowy sumaryczny nalot dla pilotów
+    SELECT 
+        COALESCE(SUM(EXTRACT(HOUR FROM (godzina_ladowania - godzina_wylotu))), 0)
+    INTO 
+        pilot1_nalot
+    FROM 
+        raporty.loty
+    WHERE 
+        pilot1 = NEW.pilot1 AND godzina_ladowania > (CURRENT_TIMESTAMP - INTERVAL '7 days');
+
+    SELECT 
+        COALESCE(SUM(EXTRACT(HOUR FROM (godzina_ladowania - godzina_wylotu))), 0)
+    INTO 
+        pilot2_nalot
+    FROM 
+        raporty.loty
+    WHERE 
+        pilot2 = NEW.pilot2 AND godzina_ladowania > (CURRENT_TIMESTAMP - INTERVAL '7 days');
+
+    -- Sprawdź, czy którykolwiek z pilotów przekroczył limit 40 godzin
+    IF pilot1_nalot + pilot2_nalot > 40 THEN
+        RAISE EXCEPTION 'Przekroczony tygodniowy limit nalotu dla któregoś z pilotów';
+    END IF;
+
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Utwórz wyzwalacz
+CREATE TRIGGER sprawdz_nalot_trigger
+BEFORE INSERT ON raporty.loty
+FOR EACH ROW
+EXECUTE FUNCTION sprawdz_nalot();
+
+
 
 
 /*
