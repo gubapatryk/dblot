@@ -361,3 +361,166 @@ ORDER BY
 GRANT SELECT ON raporty.raport_roczny_zespol TO dowodca;
 GRANT SELECT ON raporty.raport_roczny_zespol TO kierownik;
 GRANT SELECT ON raporty.raport_roczny_zespol TO pilot;
+
+
+
+-- funkcje, kury, procedury 
+
+SELECT setval(pg_get_serial_sequence('raporty.pracownicy', 'id'), coalesce(MAX(id), 1))
+from raporty.pracownicy;
+
+CREATE OR REPLACE PROCEDURE raporty.dodaj_pracownika(
+    p_zespol INT,
+    p_imie VARCHAR(60),
+    p_nazwisko VARCHAR(60),
+    p_data_zatrudnienia DATE,
+    p_data_zakonczenia DATE
+)
+AS
+$$
+BEGIN
+    INSERT INTO raporty.pracownicy (zespol, imie, nazwisko, data_zatrudnienia, data_zakonczenia)
+    VALUES (p_zespol, p_imie, p_nazwisko, p_data_zatrudnienia, p_data_zakonczenia);
+END;
+$$
+LANGUAGE plpgsql;
+
+CREATE OR REPLACE PROCEDURE raporty.zwolnij_pracownika(
+    p_id_pracownika INT,
+    p_data_zakonczenia DATE
+)
+AS
+$$
+BEGIN
+    UPDATE raporty.pracownicy
+    SET data_zakonczenia = p_data_zakonczenia
+    WHERE id = p_id_pracownika;
+END;
+$$
+LANGUAGE plpgsql;
+
+CREATE OR REPLACE FUNCTION raporty.szukaj_zespoly(p_nazwa_zespolu TEXT)
+RETURNS TABLE (
+    id int,
+    nazwa VARCHAR(100)
+)
+AS
+$$
+BEGIN
+    RETURN QUERY
+    SELECT z.id, z.nazwa
+    FROM raporty.zespoly z 
+    WHERE z.nazwa ILIKE '%' || p_nazwa_zespolu || '%';
+END;
+$$
+LANGUAGE plpgsql;
+
+
+-- SELECT * FROM raporty.szukaj_zespoly('andrz');
+
+CREATE OR REPLACE FUNCTION raporty.szukaj_pracownikow(p_nazwa_pracownika TEXT)
+RETURNS TABLE (
+    id INT,
+    imie_nazwisko TEXT
+)
+AS
+$$
+BEGIN
+    RETURN QUERY
+    SELECT p.id, p.imie || ' ' || p.nazwisko AS imie_nazwisko
+    FROM raporty.pracownicy p
+    WHERE p.imie || ' ' || p.nazwisko ILIKE '%' || p_nazwa_pracownika || '%';
+END;
+$$
+LANGUAGE plpgsql;
+
+-- SELECT * FROM raporty.szukaj_pracownikow('kowal');
+
+
+-- GRANT USAGE, CREATE ON SCHEMA raporty TO dowodca;
+
+GRANT EXECUTE ON ALL PROCEDURES IN SCHEMA raporty TO dowodca;
+
+
+-- zlozona procedura
+
+CREATE OR REPLACE PROCEDURE raporty.dodaj_lot_szkoleniowy(
+    p_pilot1 INT,
+    p_pilot2 INT,
+    p_rejestracja VARCHAR(6),
+    p_kategoria VARCHAR(3),
+    p_lotnisko_wylotu VARCHAR(3),
+    p_lotnisko_przylotu VARCHAR(3),
+    p_godzina_wylotu TIMESTAMP,
+    p_godzina_ladowania TIMESTAMP
+)
+AS
+$$
+DECLARE
+    v_kierownik INT;
+BEGIN
+    -- Sprawdź, czy spośród pilotów znajduje się pilot będący kierownikiem
+    SELECT id_pracownika INTO v_kierownik
+    FROM raporty.kierownicy
+    WHERE id_pracownika IN (p_pilot1, p_pilot2)
+      AND rozpoczecie <= CURRENT_TIMESTAMP
+      AND (zakonczenie IS NULL OR zakonczenie > CURRENT_TIMESTAMP);
+
+    IF v_kierownik IS NULL THEN
+        RAISE EXCEPTION 'Żaden z pilotów nie jest kierownikiem';
+    END IF;
+
+    -- Sprawdź, czy posiadają aktualne badania lekarskie
+    IF NOT EXISTS (
+        SELECT 1
+        FROM raporty.badania
+        WHERE id_pracownika IN (p_pilot1, p_pilot2)
+          AND data_waznosci >= CURRENT_DATE
+    ) THEN
+        RAISE EXCEPTION 'Pilot(y) nie ma/mają aktualnych badań lekarskich';
+    END IF;
+
+    -- Sprawdź, czy w tym momencie nie uczestniczyli już w innym locie
+    IF EXISTS (
+        SELECT 1
+        FROM raporty.loty
+        WHERE (p_pilot1 IN (pilot1, pilot2) OR p_pilot2 IN (pilot1, pilot2))
+          AND (p_godzina_wylotu, p_godzina_ladowania) OVERLAPS (godzina_wylotu, godzina_ladowania)
+    ) THEN
+        RAISE EXCEPTION 'Pilot(y) uczestniczą już w innym locie w tym czasie';
+    END IF;
+
+    -- Sprawdź, czy pojazd o podanej rejestracji nie był już w innym locie
+    IF EXISTS (
+        SELECT 1
+        FROM raporty.loty
+        WHERE rejestracja = p_rejestracja
+          AND (p_godzina_wylotu, p_godzina_ladowania) OVERLAPS (godzina_wylotu, godzina_ladowania)
+    ) THEN
+        RAISE EXCEPTION 'Pojazd o podanej rejestracji uczestniczył już w innym locie w tym czasie';
+    END IF;
+
+    -- Dodaj rekord do tabeli raporty.szkolenia
+    INSERT INTO raporty.szkolenia (id_pracownika, nazwa, data_aktualizacji, data_waznosci)
+    VALUES (v_kierownik, 'Lot szkoleniowy', CURRENT_DATE, CURRENT_DATE + INTERVAL '1 year');
+
+    -- Dodaj rekord do tabeli raporty.loty
+    INSERT INTO raporty.loty (pilot1, pilot2, rejestracja, kategoria, lotnisko_wylotu, lotnisko_przylotu, godzina_wylotu, godzina_ladowania)
+    VALUES (p_pilot1, p_pilot2, p_rejestracja, p_kategoria, p_lotnisko_wylotu, p_lotnisko_przylotu, p_godzina_wylotu, p_godzina_ladowania);
+END;
+$$
+LANGUAGE plpgsql;
+
+
+/*
+CALL raporty.dodaj_lot_szkoleniowy(
+    p_pilot1 := 7,
+    p_pilot2 := 8,
+    p_rejestracja := 'SP-SRS',
+    p_kategoria := 'IFR',
+    p_lotnisko_wylotu := 'WAW',
+    p_lotnisko_przylotu := 'KRK',
+    p_godzina_wylotu := '2023-11-06T12:00:00',
+    p_godzina_ladowania := '2023-11-06T14:00:00'
+);
+*/
