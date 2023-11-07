@@ -578,3 +578,236 @@ CALL raporty.dodaj_lot_szkoleniowy(
     p_godzina_ladowania := '2023-11-06T14:00:00'
 );
 */
+
+
+-- generuj raport, ale dla podanego w parametrach miesiaca (nie obecnego miesiaca)
+
+CREATE OR REPLACE FUNCTION raporty.generuj_raport_miesieczny_zespol(miesiac INTEGER, rok INTEGER)
+RETURNS TABLE (
+    id_pilota INTEGER,
+    pilot TEXT,
+    suma_czasu_lotu TEXT
+) AS $$
+BEGIN
+    RETURN QUERY
+    SELECT
+        p.id AS id_pilota,
+        p.imie || ' ' || p.nazwisko AS pilot,
+        COALESCE(
+            ROUND(SUM(EXTRACT(EPOCH FROM (l.godzina_ladowania - l.godzina_wylotu))) / 3600) || ' godz ' || 
+            ROUND(MOD(SUM(EXTRACT(EPOCH FROM (l.godzina_ladowania - l.godzina_wylotu))), 3600) / 60) || ' min'
+        , '0 godz 0 min'
+        ) AS suma_czasu_lotu
+    FROM
+        raporty.pracownicy p
+    LEFT JOIN
+        raporty.loty l ON p.id IN (l.pilot1, l.pilot2)
+            AND EXTRACT(MONTH FROM l.godzina_ladowania) = miesiac
+            AND EXTRACT(YEAR FROM l.godzina_ladowania) = rok
+    WHERE
+        (l.godzina_ladowania IS NULL OR p.data_zakonczenia IS NULL)
+        AND p.zespol IN (SELECT zespol FROM raporty.pracownicy p
+                        JOIN raporty.sys_user_prac s ON p.id = s.id_prac
+                        WHERE s.username = current_user)
+    GROUP BY
+        p.id
+    ORDER BY
+        pilot DESC;
+
+    RETURN;
+END;
+$$ LANGUAGE plpgsql;
+
+
+-- raport roczny dla zespolu z parametrem rok
+
+CREATE OR REPLACE FUNCTION raporty.generuj_raport_roczny_zespol(rok INTEGER)
+RETURNS TABLE (
+    id_pilota INTEGER,
+    pilot TEXT,
+    suma_czasu_lotu TEXT
+) AS $$
+BEGIN
+    RETURN QUERY
+    SELECT
+        p.id AS id_pilota,
+        p.imie || ' ' || p.nazwisko AS pilot,
+        COALESCE(
+            ROUND(SUM(EXTRACT(EPOCH FROM (l.godzina_ladowania - l.godzina_wylotu))) / 3600) || ' godz ' || 
+            ROUND(MOD(SUM(EXTRACT(EPOCH FROM (l.godzina_ladowania - l.godzina_wylotu))), 3600) / 60) || ' min'
+        , '0 godz 0 min'
+        ) AS suma_czasu_lotu
+    FROM
+        raporty.pracownicy p
+    LEFT JOIN
+        raporty.loty l ON p.id IN (l.pilot1, l.pilot2)
+            AND EXTRACT(YEAR FROM l.godzina_ladowania) = rok
+    WHERE
+        (l.godzina_ladowania IS NULL OR p.data_zakonczenia IS NULL)
+        AND p.zespol IN (SELECT zespol FROM raporty.pracownicy p
+                        JOIN raporty.sys_user_prac s ON p.id = s.id_prac
+                        WHERE s.username = current_user)
+    GROUP BY
+        p.id
+    ORDER BY
+        pilot DESC;
+
+    RETURN;
+END;
+$$ LANGUAGE plpgsql;
+
+-- raport miesieczny dla jednostki
+
+CREATE OR REPLACE FUNCTION raporty.generuj_raport_miesieczny(miesiac INTEGER, rok INTEGER)
+RETURNS TABLE (
+    id_pilota INTEGER,
+    pilot TEXT,
+    suma_czasu_lotu TEXT
+) AS $$
+BEGIN
+    RETURN QUERY
+    SELECT
+        p.id AS id_pilota,
+        p.imie || ' ' || p.nazwisko AS pilot,
+        COALESCE(
+            ROUND(SUM(EXTRACT(EPOCH FROM (l.godzina_ladowania - l.godzina_wylotu))) / 3600) || ' godz ' || 
+            ROUND(MOD(SUM(EXTRACT(EPOCH FROM (l.godzina_ladowania - l.godzina_wylotu))), 3600) / 60) || ' min'
+        , '0 godz 0 min'
+        ) AS suma_czasu_lotu
+    FROM
+        raporty.pracownicy p
+    LEFT JOIN
+        raporty.loty l ON p.id IN (l.pilot1, l.pilot2)
+            AND EXTRACT(MONTH FROM l.godzina_ladowania) = miesiac
+            AND EXTRACT(YEAR FROM l.godzina_ladowania) = rok
+    WHERE
+        (l.godzina_ladowania IS NULL OR p.data_zakonczenia IS NULL)
+    GROUP BY
+        p.id
+    ORDER BY
+        pilot DESC;
+
+    RETURN;
+END;
+$$ LANGUAGE plpgsql;
+
+-- raport roczny dla jednostki
+
+CREATE OR REPLACE FUNCTION raporty.generuj_raport_roczny(rok INTEGER)
+RETURNS TABLE (
+    id_pilota INTEGER,
+    pilot TEXT,
+    suma_czasu_lotu TEXT
+) AS $$
+BEGIN
+    RETURN QUERY
+    SELECT
+        p.id AS id_pilota,
+        p.imie || ' ' || p.nazwisko AS pilot,
+        COALESCE(
+            ROUND(SUM(EXTRACT(EPOCH FROM (l.godzina_ladowania - l.godzina_wylotu))) / 3600) || ' godz ' || 
+            ROUND(MOD(SUM(EXTRACT(EPOCH FROM (l.godzina_ladowania - l.godzina_wylotu))), 3600) / 60) || ' min'
+        , '0 godz 0 min'
+        ) AS suma_czasu_lotu
+    FROM
+        raporty.pracownicy p
+    LEFT JOIN
+        raporty.loty l ON p.id IN (l.pilot1, l.pilot2)
+    WHERE
+        (EXTRACT(YEAR FROM l.godzina_ladowania) = rok
+        OR l.godzina_ladowania IS NULL) 
+        AND p.data_zakonczenia IS NULL
+    GROUP BY
+        p.id, p.imie, p.nazwisko
+    ORDER BY
+        pilot DESC;
+
+    RETURN;
+END;
+$$ LANGUAGE plpgsql;
+
+
+/*
+CREATE VIEW raporty.raport_roczny AS
+SELECT
+    p.id AS id_pilota,
+    p.imie || ' ' || p.nazwisko AS pilot,
+    COALESCE(SUM(EXTRACT(EPOCH FROM (l.godzina_ladowania - l.godzina_wylotu))) / 3600,0) AS suma_czasu_lotu_godziny
+FROM
+    raporty.pracownicy p
+LEFT JOIN
+    raporty.loty l ON p.id IN (l.pilot1, l.pilot2)
+WHERE
+    (EXTRACT(YEAR FROM l.godzina_ladowania) = EXTRACT(YEAR FROM CURRENT_DATE) OR l.godzina_ladowania IS NULL) 
+    AND p.data_zakonczenia IS NULL
+GROUP BY
+    p.id, p.imie, p.nazwisko
+ORDER BY
+    suma_czasu_lotu_godziny DESC;
+
+
+
+CREATE VIEW raporty.raport_miesieczny AS
+SELECT
+    p.id AS id_pilota,
+    p.imie || ' ' || p.nazwisko AS pilot,
+    COALESCE(SUM(EXTRACT(EPOCH FROM (l.godzina_ladowania - l.godzina_wylotu))) / 3600,0) AS suma_czasu_lotu_godziny
+FROM
+    raporty.pracownicy p
+LEFT JOIN
+    raporty.loty l ON p.id IN (l.pilot1, l.pilot2)
+WHERE
+    ((EXTRACT(MONTH FROM l.godzina_ladowania) = EXTRACT(MONTH FROM CURRENT_DATE) 
+    AND  EXTRACT(YEAR FROM l.godzina_ladowania) = EXTRACT(YEAR FROM CURRENT_DATE)) OR l.godzina_ladowania IS NULL) 
+    AND p.data_zakonczenia IS NULL
+GROUP BY
+    p.id, p.imie, p.nazwisko
+ORDER BY
+    suma_czasu_lotu_godziny DESC;
+
+CREATE VIEW raporty.raport_miesieczny_zespol AS
+SELECT
+    p.id AS id_pilota,
+    p.imie || ' ' || p.nazwisko AS pilot,
+    COALESCE(SUM(EXTRACT(EPOCH FROM (l.godzina_ladowania - l.godzina_wylotu))) / 3600,0) AS suma_czasu_lotu_godziny
+FROM
+    raporty.pracownicy p
+LEFT JOIN
+    raporty.loty l ON p.id IN (l.pilot1, l.pilot2)
+WHERE
+    ((EXTRACT(MONTH FROM l.godzina_ladowania) = EXTRACT(MONTH FROM CURRENT_DATE) 
+    AND  EXTRACT(YEAR FROM l.godzina_ladowania) = EXTRACT(YEAR FROM CURRENT_DATE)) OR l.godzina_ladowania IS NULL) 
+    AND p.data_zakonczenia IS NULL
+    AND p.zespol IN (SELECT zespol from raporty.pracownicy p
+JOIN
+    raporty.sys_user_prac s ON p.id = s.id_prac where s.username=current_user)
+GROUP BY
+    p.id, p.imie, p.nazwisko
+ORDER BY
+    suma_czasu_lotu_godziny DESC;
+
+
+SELECT
+        p.id AS id_pilota,
+        p.imie || ' ' || p.nazwisko AS pilot,
+        COALESCE(SUM(EXTRACT(EPOCH FROM (l.godzina_ladowania - l.godzina_wylotu))) / 3600, 0) AS suma_czasu_lotu_godziny
+    FROM
+        raporty.pracownicy p
+    LEFT JOIN
+        raporty.loty l ON p.id IN (l.pilot1, l.pilot2)
+    WHERE
+        (EXTRACT(MONTH FROM l.godzina_ladowania) = 5
+        AND EXTRACT(YEAR FROM l.godzina_ladowania) = 2023
+        OR l.godzina_ladowania IS NULL)
+        AND p.data_zakonczenia IS NULL
+        AND p.zespol IN (SELECT zespol FROM raporty.pracownicy p
+                        JOIN raporty.sys_user_prac s ON p.id = s.id_prac
+                        WHERE s.username = current_user)
+    GROUP BY
+        p.id;
+
+
+
+
+*/
+
