@@ -405,7 +405,7 @@ END;
 $$
 LANGUAGE plpgsql;
 
-CREATE OR REPLACE FUNCTION raporty.szukaj_zespoly(p_nazwa_zespolu TEXT)
+CREATE OR REPLACE FUNCTION raporty.szukaj_zespolow(p_nazwa_zespolu TEXT)
 RETURNS TABLE (
     id int,
     nazwa VARCHAR(100)
@@ -441,7 +441,6 @@ $$
 LANGUAGE plpgsql;
 
 -- SELECT * FROM raporty.szukaj_pracownikow('kowal');
-
 
 -- GRANT USAGE, CREATE ON SCHEMA raporty TO dowodca;
 
@@ -518,52 +517,6 @@ BEGIN
 END;
 $$
 LANGUAGE plpgsql;
-
-
--- sprawdzanie limitu nalotu w tygodniu wyzwalaczem
-
-
-CREATE OR REPLACE FUNCTION sprawdz_nalot()
-RETURNS TRIGGER AS $$
-DECLARE
-    pilot1_nalot INT;
-    pilot2_nalot INT;
-BEGIN
-    -- Pobierz tygodniowy sumaryczny nalot dla pilotów
-    SELECT 
-        COALESCE(SUM(EXTRACT(HOUR FROM (godzina_ladowania - godzina_wylotu))), 0)
-    INTO 
-        pilot1_nalot
-    FROM 
-        raporty.loty
-    WHERE 
-        pilot1 = NEW.pilot1 AND godzina_ladowania > (CURRENT_TIMESTAMP - INTERVAL '7 days');
-
-    SELECT 
-        COALESCE(SUM(EXTRACT(HOUR FROM (godzina_ladowania - godzina_wylotu))), 0)
-    INTO 
-        pilot2_nalot
-    FROM 
-        raporty.loty
-    WHERE 
-        pilot2 = NEW.pilot2 AND godzina_ladowania > (CURRENT_TIMESTAMP - INTERVAL '7 days');
-
-    -- Sprawdź, czy którykolwiek z pilotów przekroczył limit 40 godzin
-    IF pilot1_nalot + pilot2_nalot > 40 THEN
-        RAISE EXCEPTION 'Przekroczony tygodniowy limit nalotu dla któregoś z pilotów';
-    END IF;
-
-    RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-
--- Utwórz wyzwalacz
-CREATE TRIGGER sprawdz_nalot_trigger
-BEFORE INSERT ON raporty.loty
-FOR EACH ROW
-EXECUTE FUNCTION sprawdz_nalot();
-
-
 
 
 /*
@@ -728,86 +681,248 @@ $$ LANGUAGE plpgsql;
 
 
 /*
-CREATE VIEW raporty.raport_roczny AS
-SELECT
-    p.id AS id_pilota,
-    p.imie || ' ' || p.nazwisko AS pilot,
-    COALESCE(SUM(EXTRACT(EPOCH FROM (l.godzina_ladowania - l.godzina_wylotu))) / 3600,0) AS suma_czasu_lotu_godziny
-FROM
-    raporty.pracownicy p
-LEFT JOIN
-    raporty.loty l ON p.id IN (l.pilot1, l.pilot2)
-WHERE
-    (EXTRACT(YEAR FROM l.godzina_ladowania) = EXTRACT(YEAR FROM CURRENT_DATE) OR l.godzina_ladowania IS NULL) 
-    AND p.data_zakonczenia IS NULL
-GROUP BY
-    p.id, p.imie, p.nazwisko
-ORDER BY
-    suma_czasu_lotu_godziny DESC;
+*/
+
+
+-- wyzwalacze
 
 
 
-CREATE VIEW raporty.raport_miesieczny AS
-SELECT
-    p.id AS id_pilota,
-    p.imie || ' ' || p.nazwisko AS pilot,
-    COALESCE(SUM(EXTRACT(EPOCH FROM (l.godzina_ladowania - l.godzina_wylotu))) / 3600,0) AS suma_czasu_lotu_godziny
-FROM
-    raporty.pracownicy p
-LEFT JOIN
-    raporty.loty l ON p.id IN (l.pilot1, l.pilot2)
-WHERE
-    ((EXTRACT(MONTH FROM l.godzina_ladowania) = EXTRACT(MONTH FROM CURRENT_DATE) 
-    AND  EXTRACT(YEAR FROM l.godzina_ladowania) = EXTRACT(YEAR FROM CURRENT_DATE)) OR l.godzina_ladowania IS NULL) 
-    AND p.data_zakonczenia IS NULL
-GROUP BY
-    p.id, p.imie, p.nazwisko
-ORDER BY
-    suma_czasu_lotu_godziny DESC;
+-- Sprawdzanie limitu nalotu w tygodniu wyzwalaczem
 
-CREATE VIEW raporty.raport_miesieczny_zespol AS
-SELECT
-    p.id AS id_pilota,
-    p.imie || ' ' || p.nazwisko AS pilot,
-    COALESCE(SUM(EXTRACT(EPOCH FROM (l.godzina_ladowania - l.godzina_wylotu))) / 3600,0) AS suma_czasu_lotu_godziny
-FROM
-    raporty.pracownicy p
-LEFT JOIN
-    raporty.loty l ON p.id IN (l.pilot1, l.pilot2)
-WHERE
-    ((EXTRACT(MONTH FROM l.godzina_ladowania) = EXTRACT(MONTH FROM CURRENT_DATE) 
-    AND  EXTRACT(YEAR FROM l.godzina_ladowania) = EXTRACT(YEAR FROM CURRENT_DATE)) OR l.godzina_ladowania IS NULL) 
-    AND p.data_zakonczenia IS NULL
-    AND p.zespol IN (SELECT zespol from raporty.pracownicy p
-JOIN
-    raporty.sys_user_prac s ON p.id = s.id_prac where s.username=current_user)
-GROUP BY
-    p.id, p.imie, p.nazwisko
-ORDER BY
-    suma_czasu_lotu_godziny DESC;
+CREATE OR REPLACE FUNCTION sprawdz_przekroczenie_nalotu()
+RETURNS TRIGGER AS $$
+DECLARE
+    suma_czasu_lotu_pilota1 INT;
+    suma_czasu_lotu_pilota2 INT;
+BEGIN
+    -- Obliczanie sumy czasu lotu dla pilota1
+    SELECT COALESCE(SUM(EXTRACT(EPOCH FROM (godzina_ladowania - godzina_wylotu))) / 3600, 0)
+    INTO suma_czasu_lotu_pilota1
+    FROM raporty.loty l
+    WHERE l.pilot1 = NEW.pilot1
+      AND EXTRACT('week' FROM l.godzina_ladowania) = EXTRACT('week' FROM CURRENT_DATE) AND  EXTRACT(YEAR FROM l.godzina_ladowania) = EXTRACT(YEAR FROM CURRENT_DATE);
 
+    -- Obliczanie sumy czasu lotu dla pilota2
+    SELECT COALESCE(SUM(EXTRACT(EPOCH FROM (godzina_ladowania - godzina_wylotu))) / 3600, 0)
+    INTO suma_czasu_lotu_pilota2
+    FROM raporty.loty l
+    WHERE (l.pilot2 IS NOT NULL AND (l.pilot2 = NEW.pilot1 OR l.pilot2 = NEW.pilot2))
+      AND EXTRACT('week' FROM l.godzina_ladowania) = EXTRACT('week' FROM CURRENT_DATE) AND  EXTRACT(YEAR FROM l.godzina_ladowania) = EXTRACT(YEAR FROM CURRENT_DATE);
 
-SELECT
-        p.id AS id_pilota,
-        p.imie || ' ' || p.nazwisko AS pilot,
-        COALESCE(SUM(EXTRACT(EPOCH FROM (l.godzina_ladowania - l.godzina_wylotu))) / 3600, 0) AS suma_czasu_lotu_godziny
-    FROM
-        raporty.pracownicy p
-    LEFT JOIN
-        raporty.loty l ON p.id IN (l.pilot1, l.pilot2)
-    WHERE
-        (EXTRACT(MONTH FROM l.godzina_ladowania) = 5
-        AND EXTRACT(YEAR FROM l.godzina_ladowania) = 2023
-        OR l.godzina_ladowania IS NULL)
-        AND p.data_zakonczenia IS NULL
-        AND p.zespol IN (SELECT zespol FROM raporty.pracownicy p
-                        JOIN raporty.sys_user_prac s ON p.id = s.id_prac
-                        WHERE s.username = current_user)
-    GROUP BY
-        p.id;
+    -- Sprawdzanie czy suma czasu lotu przekracza 40 godzin
+    IF suma_czasu_lotu_pilota1 > 40 THEN
+        RAISE NOTICE 'Suma nalotu pilota 1 w tym tygodniu przekroczyła 40 godzin';
+    ELSIF suma_czasu_lotu_pilota1 > 35 THEN
+        RAISE NOTICE 'Suma nalotu pilota 1 w tym tygodniu przekroczyła 35 godzin';    
+    END IF;
+
+    IF suma_czasu_lotu_pilota2 > 40 THEN
+        RAISE NOTICE 'Suma nalotu pilota 2 w tym tygodniu przekroczyła 40 godzin';
+    ELSIF suma_czasu_lotu_pilota2 > 35 THEN
+        RAISE NOTICE 'Suma nalotu pilota 2 w tym tygodniu przekroczyła 35 godzin';
+    END IF;
+
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Utwórz wyzwalacz, który będzie aktywowany po każdym wstawieniu do tabeli raporty.loty
+CREATE TRIGGER sprawdz_przekroczenie_nalotu_trigger
+AFTER INSERT ON raporty.loty
+FOR EACH ROW
+EXECUTE FUNCTION sprawdz_przekroczenie_nalotu();
 
 
 
+CREATE OR REPLACE FUNCTION sprawdz_nakladanie_sie_lotow()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF EXISTS (
+        SELECT 1
+        FROM raporty.loty l
+        WHERE (NEW.pilot1 = l.pilot1 OR NEW.pilot1 = l.pilot2 OR NEW.pilot2 = l.pilot1 OR NEW.pilot2 = l.pilot2)
+          AND (
+            (NEW.godzina_wylotu >= l.godzina_wylotu AND NEW.godzina_wylotu < l.godzina_ladowania)
+            OR (NEW.godzina_ladowania > l.godzina_wylotu AND NEW.godzina_ladowania <= l.godzina_ladowania)
+            OR (NEW.godzina_wylotu <= l.godzina_wylotu AND NEW.godzina_ladowania >= l.godzina_ladowania)
+        )
+    ) THEN
+        RAISE EXCEPTION 'Pilot lub maszyna już zajęta w tym czasie';
+        RETURN NULL;
+    END IF;
+
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER sprawdz_nakladanie_sie_lotow_trigger
+BEFORE INSERT ON raporty.loty
+FOR EACH ROW
+EXECUTE FUNCTION sprawdz_nakladanie_sie_lotow();
+
+
+/*
+jednostka=> select * from raporty.loty order by id desc limit 5;
+ id | pilot1 | pilot2 | rejestracja | kategoria | lotnisko_wylotu | lotnisko_przylotu |   godzina_wylotu    |  godzina_ladowania  
+----+--------+--------+-------------+-----------+-----------------+-------------------+---------------------+---------------------
+ 27 |      4 |        | SP-S24      | IFR       | EPB             | EPB               | 2023-10-26 09:30:00 | 2023-10-26 15:45:00
+ 26 |      3 |      5 | SP-SRS      | SKL       | EPB             | GDN               | 2023-10-26 07:15:00 | 2023-10-26 17:30:00
+ 25 |      3 |      4 | SP-SRS      | SKL       | GDN             | EPB               | 2023-10-25 07:15:00 | 2023-10-25 16:30:00
+ 24 |      3 |      4 | SP-SRS      | SKL       | EPB             | GDN               | 2023-10-24 07:15:00 | 2023-10-24 16:30:00
+ 23 |      3 |      4 | SP-SRS      | SKL       | GDN             | EPB               | 2023-10-23 07:15:00 | 2023-10-23 16:45:00
+(5 rows)
+INSERT INTO raporty.loty (pilot1, pilot2, rejestracja, kategoria, lotnisko_wylotu, lotnisko_przylotu, godzina_wylotu, godzina_ladowania)
+VALUES
+    (5,7, 'SP-SRS', 'IFR', 'WAW', 'KRK', '2023-11-01 12:00:00', '2023-11-05 15:00:00');
+
+jednostka=> INSERT INTO raporty.loty (pilot1, pilot2, rejestracja, kategoria, lotnisko_wylotu, lotnisko_przylotu, godzina_wylotu, godzina_ladowania)
+VALUES
+    (5,8, 'SP-SRS', 'IFR', 'WAW', 'KRK', '2023-11-04 12:00:00', '2023-11-04 15:00:00');
+INSERT 0 1
+
+jednostka=> select * from raporty.loty order by id desc limit 5;
+ id | pilot1 | pilot2 | rejestracja | kategoria | lotnisko_wylotu | lotnisko_przylotu |   godzina_wylotu    |  godzina_ladowania  
+----+--------+--------+-------------+-----------+-----------------+-------------------+---------------------+---------------------
+ 28 |      5 |      8 | SP-SRS      | IFR       | WAW             | KRK               | 2023-11-04 12:00:00 | 2023-11-04 15:00:00
+ 27 |      4 |        | SP-S24      | IFR       | EPB             | EPB               | 2023-10-26 09:30:00 | 2023-10-26 15:45:00
+ 26 |      3 |      5 | SP-SRS      | SKL       | EPB             | GDN               | 2023-10-26 07:15:00 | 2023-10-26 17:30:00
+ 25 |      3 |      4 | SP-SRS      | SKL       | GDN             | EPB               | 2023-10-25 07:15:00 | 2023-10-25 16:30:00
+ 24 |      3 |      4 | SP-SRS      | SKL       | EPB             | GDN               | 2023-10-24 07:15:00 | 2023-10-24 16:30:00
+(5 rows)
+
+jednostka=> INSERT INTO raporty.loty (pilot1, pilot2, rejestracja, kategoria, lotnisko_wylotu, lotnisko_przylotu, godzina_wylotu, godzina_ladowania)
+VALUES
+    (5,7, 'SP-SRS', 'IFR', 'WAW', 'KRK', '2023-11-01 12:00:00', '2023-11-05 15:00:00');
+ERROR:  Pilot lub maszyna już zajęta w tym czasie
+CONTEXT:  PL/pgSQL function sprawdz_nakladanie_sie_lotow() line 13 at RAISE
+jednostka=> select * from raporty.loty order by id desc limit 5;
+ id | pilot1 | pilot2 | rejestracja | kategoria | lotnisko_wylotu | lotnisko_przylotu |   godzina_wylotu    |  godzina_ladowania  
+----+--------+--------+-------------+-----------+-----------------+-------------------+---------------------+---------------------
+ 28 |      5 |      8 | SP-SRS      | IFR       | WAW             | KRK               | 2023-11-04 12:00:00 | 2023-11-04 15:00:00
+ 27 |      4 |        | SP-S24      | IFR       | EPB             | EPB               | 2023-10-26 09:30:00 | 2023-10-26 15:45:00
+ 26 |      3 |      5 | SP-SRS      | SKL       | EPB             | GDN               | 2023-10-26 07:15:00 | 2023-10-26 17:30:00
+ 25 |      3 |      4 | SP-SRS      | SKL       | GDN             | EPB               | 2023-10-25 07:15:00 | 2023-10-25 16:30:00
+ 24 |      3 |      4 | SP-SRS      | SKL       | EPB             | GDN               | 2023-10-24 07:15:00 | 2023-10-24 16:30:00
+(5 rows)
+*/
+
+/*
+
+jednostka=> select * from raporty.loty order by id desc limit 5;
+ id | pilot1 | pilot2 | rejestracja | kategoria | lotnisko_wylotu | lotnisko_przylotu |   godzina_wylotu    |  godzina_ladowania  
+----+--------+--------+-------------+-----------+-----------------+-------------------+---------------------+---------------------
+ 27 |      4 |        | SP-S24      | IFR       | EPB             | EPB               | 2023-10-26 09:30:00 | 2023-10-26 15:45:00
+ 26 |      3 |      5 | SP-SRS      | SKL       | EPB             | GDN               | 2023-10-26 07:15:00 | 2023-10-26 17:30:00
+ 25 |      3 |      4 | SP-SRS      | SKL       | GDN             | EPB               | 2023-10-25 07:15:00 | 2023-10-25 16:30:00
+ 24 |      3 |      4 | SP-SRS      | SKL       | EPB             | GDN               | 2023-10-24 07:15:00 | 2023-10-24 16:30:00
+ 23 |      3 |      4 | SP-SRS      | SKL       | GDN             | EPB               | 2023-10-23 07:15:00 | 2023-10-23 16:45:00
+(5 rows)
+
+
+jednostka=> select raporty.generuj_raport_miesieczny_zespol(11,2023);
+    generuj_raport_miesieczny_zespol    
+----------------------------------------
+ (8,"Patryk Guba","0 godz 0 min")
+ (5,"Grzegorz Jaworski","0 godz 0 min")
+ (7,"Andrzej Nowak","0 godz 0 min")
+
+jednostka=> INSERT INTO raporty.loty (pilot1, pilot2, rejestracja, kategoria, lotnisko_wylotu, lotnisko_przylotu, godzina_wylotu, godzina_ladowania)
+VALUES
+    (5,8, 'SP-SRS', 'IFR', 'WAW', 'KRK', '2023-11-06 02:00:00', '2023-11-07 15:00:00');
+NOTICE:  Suma nalotu pilota 1 w tym tygodniu przekroczyła 35 godzin
+NOTICE:  Suma nalotu pilota 2 w tym tygodniu przekroczyła 35 godzin
+INSERT 0 1
+
+
+jednostka=> select * from raporty.loty order by id desc limit 5;
+ id | pilot1 | pilot2 | rejestracja | kategoria | lotnisko_wylotu | lotnisko_przylotu |   godzina_wylotu    |  godzina_ladowania  
+----+--------+--------+-------------+-----------+-----------------+-------------------+---------------------+---------------------
+ 28 |      5 |      8 | SP-SRS      | IFR       | WAW             | KRK               | 2023-11-06 02:00:00 | 2023-11-07 15:00:00
+ 27 |      4 |        | SP-S24      | IFR       | EPB             | EPB               | 2023-10-26 09:30:00 | 2023-10-26 15:45:00
+ 26 |      3 |      5 | SP-SRS      | SKL       | EPB             | GDN               | 2023-10-26 07:15:00 | 2023-10-26 17:30:00
+ 25 |      3 |      4 | SP-SRS      | SKL       | GDN             | EPB               | 2023-10-25 07:15:00 | 2023-10-25 16:30:00
+ 24 |      3 |      4 | SP-SRS      | SKL       | EPB             | GDN               | 2023-10-24 07:15:00 | 2023-10-24 16:30:00
+(5 rows)
+
+jednostka=> INSERT INTO raporty.loty (pilot1, pilot2, rejestracja, kategoria, lotnisko_wylotu, lotnisko_przylotu, godzina_wylotu, godzina_ladowania)
+VALUES
+    (5,8, 'SP-SRS', 'IFR', 'WAW', 'KRK', '2023-11-08 12:00:00', '2023-11-08 18:00:00');
+NOTICE:  Suma nalotu pilota 1 w tym tygodniu przekroczyła 40 godzin
+NOTICE:  Suma nalotu pilota 2 w tym tygodniu przekroczyła 40 godzin
+INSERT 0 1
+jednostka=> INSERT INTO raporty.loty (pilot1, pilot2, rejestracja, kategoria, lotnisko_wylotu, lotnisko_przylotu, godzina_wylotu, godzina_ladowania)
+VALUES
+    (5,7, 'SP-SRS', 'IFR', 'WAW', 'KRK', '2023-11-09 12:00:00', '2023-11-09 18:00:00');
+NOTICE:  Suma nalotu pilota 1 w tym tygodniu przekroczyła 40 godzin
+INSERT 0 1
+
+jednostka=> select * from raporty.loty order by id desc limit 5;
+ id | pilot1 | pilot2 | rejestracja | kategoria | lotnisko_wylotu | lotnisko_przylotu |   godzina_wylotu    |  godzina_ladowania  
+----+--------+--------+-------------+-----------+-----------------+-------------------+---------------------+---------------------
+ 30 |      5 |      7 | SP-SRS      | IFR       | WAW             | KRK               | 2023-11-09 12:00:00 | 2023-11-09 18:00:00
+ 29 |      5 |      8 | SP-SRS      | IFR       | WAW             | KRK               | 2023-11-08 12:00:00 | 2023-11-08 18:00:00
+ 28 |      5 |      8 | SP-SRS      | IFR       | WAW             | KRK               | 2023-11-06 02:00:00 | 2023-11-07 15:00:00
+ 27 |      4 |        | SP-S24      | IFR       | EPB             | EPB               | 2023-10-26 09:30:00 | 2023-10-26 15:45:00
+ 26 |      3 |      5 | SP-SRS      | SKL       | EPB             | GDN               | 2023-10-26 07:15:00 | 2023-10-26 17:30:00
+(5 rows)
 
 */
 
+CREATE OR REPLACE PROCEDURE raporty.ustal_nowego_kierownika(
+    p_id_pracownika INT,
+    p_id_zespolu INT
+)
+AS $$
+DECLARE
+    v_data_aktualna DATE;
+BEGIN
+    -- Pobierz aktualną datę
+    v_data_aktualna := CURRENT_DATE;
+
+    -- Znajdź dotychczasowego kierownika
+    UPDATE raporty.kierownicy
+    SET zakonczenie = v_data_aktualna
+    WHERE id_zespolu = p_id_zespolu
+        AND zakonczenie IS NULL;
+
+    -- Ustaw nowego kierownika
+    INSERT INTO raporty.kierownicy (id_zespolu, id_pracownika, rozpoczecie)
+    VALUES (p_id_zespolu, p_id_pracownika, v_data_aktualna);
+END;
+$$ LANGUAGE plpgsql;
+
+/*
+jednostka=> select * from raporty.kierownicy;
+ id_zespolu | id_pracownika | rozpoczecie | zakonczenie 
+------------+---------------+-------------+-------------
+          1 |             1 | 2010-01-01  | 2022-12-31
+          2 |             2 | 2015-01-01  | 
+          1 |             3 | 2023-01-01  | 
+          3 |             7 | 2018-01-01  | 
+(4 rows)
+jednostka=> call raporty.ustal_nowego_kierownika(8,3);
+CALL
+jednostka=> select * from raporty.kierownicy;
+ id_zespolu | id_pracownika | rozpoczecie | zakonczenie 
+------------+---------------+-------------+-------------
+          1 |             1 | 2010-01-01  | 2022-12-31
+          2 |             2 | 2015-01-01  | 
+          1 |             3 | 2023-01-01  | 
+          3 |             7 | 2018-01-01  | 2023-11-08
+          3 |             8 | 2023-11-08  | 
+(5 rows)
+*/
+
+
+-- Procedura do usuwania źle wpisanych lotów
+CREATE OR REPLACE PROCEDURE raporty.usun_lot(
+    p_id_lotu INT
+)
+AS $$
+BEGIN
+    -- Usuń lot o podanym id
+    DELETE FROM raporty.loty
+    WHERE id = p_id_lotu;
+END;
+$$ LANGUAGE plpgsql;
