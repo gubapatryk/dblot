@@ -1,0 +1,11 @@
+id,id_instytucji,id_pracownika,nazwa,data_aktualizacji,data_waznosci
+1,1,5,Szkolenie Lotnicze Podstawowe,2021-01-15,2022-01-15
+2,2,6,Szkolenie Instruktorskie Lotnictwo,2021-02-10,2022-02-10
+3,3,7,Szkolenie Medyczne Lotnictwo,2021-03-05,2022-03-05
+4,1,1,Szkolenie Awaryjne Lądowanie,2021-04-01,2025-04-01
+5,2,2,Szkolenie Lotnicze zaawansowane,2021-05-15,2022-05-15
+6,3,3,Szkolenie Ratownictwo Lotnicze,2022-06-01,2024-06-01
+7,4,4,Szkolenie Lotnicze Komunikacja,2022-07-01,2023-07-01
+8,2,5,Szkolenie Lotnicze Nocne,2022-08-01,2024-08-01
+9,3,6,Szkolenie Lotnicze Zawody,2023-09-01,2024-09-01
+10,1,7,Szkolenie Lotnicze Transportowe,2023-10-01,2024-10-01

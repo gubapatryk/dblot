@@ -1,0 +1,9 @@
+id,zespol,imie,nazwisko,data_zatrudnienia,data_zakonczenia
+1,1,Jan,Kowalski,2023-10-01,
+2,2,Max,Wojciechowski,2016-01-01,
+3,1,Remigiusz,Stępień,2017-11-01,
+4,2,Franciszek,Sikorski,2013-03-01,
+5,3,Grzegorz,Jaworski,2010-12-01,
+6,1,Janusz,Kowalski,2020-01-01,2023-10-02
+7,3,Andrzej,Nowak,2010-12-01,
+8,3,Patryk,Guba,2023-10-28,
