@@ -5,14 +5,14 @@ services:
     image: postgres
     container_name: loty_psql
     environment:
-      POSTGRES_PASSWORD: dowodca
+      POSTGRES_PASSWORD: root
     ports:
       - 5432:5432
     volumes:
       - postgres_dane_loty:/var/lib/postgresql/data/
       - ./skrypty/init.sql:/docker-entrypoint-initdb.d/init.sql
       - ./csv:/csv
-      - ./csv2:/csv2
+      - ./backupy:/backupy
    
 volumes:
  postgres_dane_loty:

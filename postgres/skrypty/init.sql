@@ -173,6 +173,8 @@ GRANT INSERT, UPDATE, DELETE ON TABLE raporty.loty TO pilot;
 CREATE USER maks WITH PASSWORD 'maks';
 GRANT pilot TO maks;
 
+
+
 COPY raporty.modele_maszyn FROM '/csv/modele_maszyn.csv' WITH (FORMAT CSV, DELIMITER ',', NULL 'null', HEADER);
 COPY raporty.instytucje_szkoleniowe FROM '/csv/instytucje_szkoleniowe.csv' WITH (FORMAT CSV, DELIMITER ',', NULL 'null', HEADER);
 COPY raporty.instytucje_medyczne FROM '/csv/instytucje_medyczne.csv' WITH (FORMAT CSV, DELIMITER ',', NULL 'null', HEADER);
@@ -187,6 +189,7 @@ COPY raporty.badania FROM '/csv/badania.csv' WITH (FORMAT CSV, DELIMITER ',', NU
 COPY raporty.lotniska FROM '/csv/lotniska.csv' WITH (FORMAT CSV, DELIMITER ',', NULL 'null', HEADER);
 COPY raporty.hangary FROM '/csv/hangary.csv' WITH (FORMAT CSV, DELIMITER ',', NULL 'null', HEADER);
 COPY raporty.loty FROM '/csv/loty.csv' WITH (FORMAT CSV, DELIMITER ',', NULL 'null', HEADER);
+
 
 --\COPY raporty.zespoly(nazwa) FROM '/csv/zespoly.csv' WITH (FORMAT CSV, DELIMITER ',', NULL 'null', HEADER);
 --\COPY raporty.pracownicy(id,zespol,imie,nazwisko,data_zatrudnienia,data_zakonczenia) FROM '/csv/pracownicy.csv' WITH DELIMITER AS ',' NULL as 'null' CSV HEADER;
@@ -379,14 +382,13 @@ CREATE OR REPLACE PROCEDURE raporty.dodaj_pracownika(
     p_zespol INT,
     p_imie VARCHAR(60),
     p_nazwisko VARCHAR(60),
-    p_data_zatrudnienia DATE,
-    p_data_zakonczenia DATE
+    p_data_zatrudnienia DATE
 )
 AS
 $$
 BEGIN
     INSERT INTO raporty.pracownicy (zespol, imie, nazwisko, data_zatrudnienia, data_zakonczenia)
-    VALUES (p_zespol, p_imie, p_nazwisko, p_data_zatrudnienia, p_data_zakonczenia);
+    VALUES (p_zespol, p_imie, p_nazwisko, p_data_zatrudnienia, NULL);
 END;
 $$
 LANGUAGE plpgsql;
@@ -473,7 +475,7 @@ BEGIN
       AND zakonczenie IS NULL;
 
     IF v_kierownik IS NULL THEN
-        RAISE EXCEPTION 'Żaden z pilotów nie jest kierownikiem';
+        RAISE EXCEPTION 'Pierwszy pilot nie jest kierownikiem';
     END IF;
 
     -- Sprawdź, czy posiadają aktualne badania lekarskie
@@ -638,7 +640,7 @@ BEGIN
     GROUP BY
         p.id
     ORDER BY
-        pilot DESC;
+        p.id ASC;
 
     RETURN;
 END;
