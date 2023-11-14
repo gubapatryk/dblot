@@ -10,6 +10,8 @@ services:
       MYSQL_PASSWORD: dowodca
     volumes:
       - maria_dane_loty:/var/lib/mysql
+      - ./etlcsv:/etlcsv
+      - ./etlsql:/etlsql
       - ./skrypty/init.sql:/docker-entrypoint-initdb.d/1.sql
     ports:
       - "3306:3306"

@@ -37,3 +37,13 @@ Przyklad importu pliku
 ```
 docker exec -it $(sudo docker ps -aqf "name=loty_mariadb") mariadb --user dowodca -pdowodca jednostka
 ```
+### ETL
+Zapisywanie danych do plików CSV z bazy danych w postgres 
+```
+docker exec -it $(sudo docker ps -aqf "name=loty_psql") psql -d jednostka -U andrzej -a -f /skrypty/backuptocsv.sql
+
+
+docker exec -it $(sudo docker ps -aqf "name=loty_mariadb") bash
+mariadb -u dowodca -pdowodca jednostka -e "source /etlsql/importcsv.sql"
+
+```

@@ -33,8 +33,7 @@ CREATE TABLE modele_maszyn (
 
 CREATE TABLE maszyny (
     rejestracja VARCHAR(6),
-    id_modelu INT NOT NULL,
-    PRIMARY KEY (rejestracja)
+    id_modelu INT NOT NULL
 );
 
 
