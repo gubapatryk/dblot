@@ -63,6 +63,15 @@ LINES TERMINATED BY '\n'
 IGNORE 1 ROWS
 (@ignore,nazwa);
 
+LOAD DATA INFILE '/etlcsv/pracownicy.csv'
+INTO TABLE pracownicy
+FIELDS TERMINATED BY ','
+ENCLOSED BY '"'
+LINES TERMINATED BY '\n'
+IGNORE 1 ROWS
+(@ignore,zespol,imie,nazwisko,data_zatrudnienia,@koniec)
+SET data_zakonczenia = NULLIF(@koniec,'');
+
 LOAD DATA INFILE '/etlcsv/kierownicy.csv'
 INTO TABLE kierownicy
 FIELDS TERMINATED BY ','
