@@ -384,53 +384,6 @@ MariaDB [jednostka]> select * from raport_roczny;
 
 /* wyzwalacze */
 
-/*
-DELIMITER //
-CREATE TRIGGER sprawdz_czas_lotu
-AFTER INSERT ON loty
-FOR EACH ROW
-BEGIN
-    DECLARE suma_czasu_lotu_pilota1 INT;
-    DECLARE suma_czasu_lotu_pilota2 INT;
-
-    -- Obliczanie sumy czasu lotu dla pilota1
-    SELECT COALESCE(SUM(TIME_TO_SEC(TIMEDIFF(godzina_ladowania, godzina_wylotu)) / 3600), 0)
-    INTO suma_czasu_lotu_pilota1
-    FROM loty l
-    WHERE l.pilot1 = NEW.pilot1
-      AND WEEK(l.godzina_ladowania) = WEEK(CURRENT_DATE) AND  YEAR(l.godzina_ladowania) = YEAR(CURRENT_DATE);
-
-    -- Obliczanie sumy czasu lotu dla pilota2
-    SELECT COALESCE(SUM(TIME_TO_SEC(TIMEDIFF(godzina_ladowania, godzina_wylotu)) / 3600), 0)
-    INTO suma_czasu_lotu_pilota2
-    FROM loty l
-    WHERE (l.pilot2 IS NOT NULL AND (l.pilot2 = NEW.pilot1 OR l.pilot2 = NEW.pilot2))
-      AND WEEK(l.godzina_ladowania) = WEEK(CURRENT_DATE) AND  YEAR(l.godzina_ladowania) = YEAR(CURRENT_DATE);
-
-    -- Sprawdzanie czy suma czasu lotu przekracza 40 godzin
-    IF (suma_czasu_lotu_pilota1 > 40) THEN
-        SIGNAL SQLSTATE '02000'
-        SET MESSAGE_TEXT = 'Suma nalotu pilota 1 w tym tygodniu przekroczyła 40 godzin';
-    ELSEIF (suma_czasu_lotu_pilota1 > 35) THEN
-        SIGNAL SQLSTATE '02000'
-        SET MESSAGE_TEXT = 'Suma nalotu pilota 1 w tym tygodniu przekroczyła 35 godzin';
-    END IF;
-
-    IF (suma_czasu_lotu_pilota2 > 40) THEN
-        SIGNAL SQLSTATE '02000'
-        SET MESSAGE_TEXT = 'Suma nalotu pilota 2 w tym tygodniu przekroczyła 40 godzin';
-    ELSEIF (suma_czasu_lotu_pilota2 > 35) THEN
-        SIGNAL SQLSTATE '02000'
-        SET MESSAGE_TEXT = 'Suma nalotu pilota 2 w tym tygodniu przekroczyła 35 godzin';
-    END IF;
-    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = suma_czasu_lotu_pilota1;
-END;
-//
-DELIMITER ;
-
-
-*/
-
 DELIMITER //
 
 CREATE OR REPLACE TRIGGER sprawdz_przekroczenie_nalotu_trigger
