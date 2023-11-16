@@ -470,8 +470,7 @@ DELIMITER ;
 
 /*
 MariaDB [jednostka]> INSERT INTO loty (pilot1, pilot2, rejestracja, kategoria, lotnisko_wylotu, lotnisko_przylotu, godzina_wylotu, godzina_ladowania)
-    -> VALUES
-    ->     (5,7, 'SP-SRS', 'IFR', 'WAW', 'KRK', '2023-11-04 02:00:00', '2023-11-05 15:00:00');
+ VALUES (5,7, 'SP-SRS', 'IFR', 'WAW', 'KRK', '2023-11-04 02:00:00', '2023-11-05 15:00:00');
 ERROR 1643 (02000): Suma nalotu co najmniej jednego z pilotow w tym tygodniu przekroczyła 35 godzin
 
 MariaDB [jednostka]> INSERT INTO loty (pilot1, pilot2, rejestracja, kategoria, lotnisko_wylotu, lotnisko_przylotu, godzina_wylotu, godzina_ladowania)
@@ -479,4 +478,135 @@ MariaDB [jednostka]> INSERT INTO loty (pilot1, pilot2, rejestracja, kategoria, l
     ->     (5,7, 'SP-SRS', 'IFR', 'WAW', 'KRK', '2023-11-04 02:00:00', '2023-11-05 15:00:00');
 ERROR 1643 (02000): Suma nalotu co najmniej jednego z pilotow w tym tygodniu przekroczyła 40 godzin
 
+*/
+
+DELIMITER //
+
+CREATE TRIGGER sprawdz_nakladanie_sie_lotow_trigger
+BEFORE INSERT ON loty
+FOR EACH ROW
+BEGIN
+    IF EXISTS (
+        SELECT 1
+        FROM loty l
+        WHERE (NEW.pilot1 = l.pilot1 OR NEW.pilot1 = l.pilot2 OR NEW.pilot2 = l.pilot1 OR NEW.pilot2 = l.pilot2)
+          AND (
+            (NEW.godzina_wylotu >= l.godzina_wylotu AND NEW.godzina_wylotu < l.godzina_ladowania)
+            OR (NEW.godzina_ladowania > l.godzina_wylotu AND NEW.godzina_ladowania <= l.godzina_ladowania)
+            OR (NEW.godzina_wylotu <= l.godzina_wylotu AND NEW.godzina_ladowania >= l.godzina_ladowania)
+        )
+    ) THEN
+        SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'Pilot lub maszyna już zajęta w tym czasie';
+    END IF;
+END;
+//
+
+DELIMITER ;
+
+/*
+MariaDB [jednostka]> INSERT INTO loty (pilot1, pilot2, rejestracja, kategoria, lotnisko_wylotu, lotnisko_przylotu, godzina_wylotu, godzina_ladowania)
+    ->  VALUES (5,7, 'SP-SRS', 'IFR', 'WAW', 'KRK', '2023-11-04 02:00:00', '2023-11-04 15:00:00');
+Query OK, 1 row affected (0.007 sec)
+
+MariaDB [jednostka]> INSERT INTO loty (pilot1, pilot2, rejestracja, kategoria, lotnisko_wylotu, lotnisko_przylotu, godzina_wylotu, godzina_ladowania)
+    ->  VALUES (5,6, 'SP-SRS', 'IFR', 'WAW', 'KRK', '2023-11-04 02:00:00', '2023-11-04 15:00:00');
+ERROR 1644 (45000): Pilot lub maszyna już zajęta w tym czasie
+*/
+
+DELIMITER //
+
+CREATE PROCEDURE ustal_nowego_kierownika(
+    IN p_id_pracownika INT,
+    IN p_id_zespolu INT
+)
+BEGIN
+    -- Pobierz aktualną datę
+    SET @v_data_aktualna = CURRENT_DATE;
+
+    -- Znajdź dotychczasowego kierownika
+    UPDATE kierownicy
+    SET zakonczenie = @v_data_aktualna
+    WHERE id_zespolu = p_id_zespolu
+        AND zakonczenie IS NULL;
+
+    -- Ustaw nowego kierownika
+    INSERT INTO kierownicy (id_zespolu, id_pracownika, rozpoczecie)
+    VALUES (p_id_zespolu, p_id_pracownika, @v_data_aktualna);
+END //
+
+DELIMITER ;
+
+
+/*
+MariaDB [jednostka]> select * from kierownicy;
++------------+---------------+-------------+-------------+
+| id_zespolu | id_pracownika | rozpoczecie | zakonczenie |
++------------+---------------+-------------+-------------+
+|          1 |             1 | 2010-01-01  | 2022-12-31  |
+|          2 |             2 | 2015-01-01  | NULL        |
+|          1 |             3 | 2023-01-01  | NULL        |
+|          3 |             7 | 2018-01-01  | NULL        |
++------------+---------------+-------------+-------------+
+4 rows in set (0.005 sec)
+
+MariaDB [jednostka]> call ustal_nowego_kierownika(8,3);
+Query OK, 2 rows affected (0.007 sec)
+
+MariaDB [jednostka]> select * from kierownicy;
++------------+---------------+-------------+-------------+
+| id_zespolu | id_pracownika | rozpoczecie | zakonczenie |
++------------+---------------+-------------+-------------+
+|          1 |             1 | 2010-01-01  | 2022-12-31  |
+|          2 |             2 | 2015-01-01  | NULL        |
+|          1 |             3 | 2023-01-01  | NULL        |
+|          3 |             7 | 2018-01-01  | 2023-11-16  |
+|          3 |             8 | 2023-11-16  | NULL        |
++------------+---------------+-------------+-------------+
+5 rows in set (0.001 sec)
+
+*/
+
+DELIMITER //
+CREATE FUNCTION raport_czasu_lotow(pracownik_id INT, miesiac INT, rok INT)
+RETURNS VARCHAR(255)
+BEGIN
+    DECLARE imie_nazwisko VARCHAR(100);
+    DECLARE godziny INT;
+    DECLARE minuty INT;
+
+    SELECT CONCAT(imie, ' ', nazwisko) INTO imie_nazwisko
+    FROM pracownicy
+    WHERE id = pracownik_id;
+
+    SELECT 
+        IFNULL(FLOOR(SUM(HOUR(TIMEDIFF(godzina_ladowania, godzina_wylotu)))),0) AS sum_godziny,
+        IFNULL(FLOOR(SUM(MINUTE(TIMEDIFF(godzina_ladowania, godzina_wylotu)))),0) AS sum_minuty
+    INTO godziny, minuty
+    FROM loty
+    WHERE 
+        (MONTH(godzina_wylotu) = miesiac AND YEAR(godzina_wylotu) = rok AND pilot1 = pracownik_id) OR
+        (MONTH(godzina_wylotu) = miesiac AND YEAR(godzina_wylotu) = rok AND pilot2 = pracownik_id);
+
+    RETURN CONCAT(imie_nazwisko, ', ', godziny, ' godzin, ', minuty, ' minut');
+END //
+DELIMITER ;
+
+
+/*
+MariaDB [jednostka]> SELECT raport_czasu_lotow(1, 8, 2023);
++---------------------------------+
+| raport_czasu_lotow(1, 8, 2023)  |
++---------------------------------+
+| Jan Kowalski, 0 godzin, 0 minut |
++---------------------------------+
+1 row in set (0.005 sec)
+
+MariaDB [jednostka]> SELECT raport_czasu_lotow(1, 9, 2023);
++----------------------------------+
+| raport_czasu_lotow(1, 9, 2023)   |
++----------------------------------+
+| Jan Kowalski, 2 godzin, 30 minut |
++----------------------------------+
+1 row in set (0.001 sec)
 */
