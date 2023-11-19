@@ -275,19 +275,24 @@ CREATE VIEW raporty.raport_miesieczny AS
 SELECT
     p.id AS id_pilota,
     p.imie || ' ' || p.nazwisko AS pilot,
-    COALESCE(SUM(EXTRACT(EPOCH FROM (l.godzina_ladowania - l.godzina_wylotu))) / 3600,0) AS suma_czasu_lotu_godziny
+    COALESCE(
+        ROUND(SUM(EXTRACT(EPOCH FROM (l.godzina_ladowania - l.godzina_wylotu))) / 3600) || ' godz ' || 
+        ROUND(MOD(SUM(EXTRACT(EPOCH FROM (l.godzina_ladowania - l.godzina_wylotu))), 3600) / 60) || ' min'
+    , '0 godz 0 min'
+    ) AS suma_czasu_lotu
 FROM
     raporty.pracownicy p
 LEFT JOIN
     raporty.loty l ON p.id IN (l.pilot1, l.pilot2)
+        AND EXTRACT(MONTH FROM l.godzina_ladowania) = EXTRACT(MONTH FROM CURRENT_DATE)
+        AND EXTRACT(YEAR FROM l.godzina_ladowania) = EXTRACT(YEAR FROM CURRENT_DATE)
+        AND p.data_zakonczenia IS NULL
 WHERE
-    ((EXTRACT(MONTH FROM l.godzina_ladowania) = EXTRACT(MONTH FROM CURRENT_DATE) 
-    AND  EXTRACT(YEAR FROM l.godzina_ladowania) = EXTRACT(YEAR FROM CURRENT_DATE)) OR l.godzina_ladowania IS NULL) 
-    AND p.data_zakonczenia IS NULL
+    p.data_zakonczenia IS NULL
 GROUP BY
-    p.id, p.imie, p.nazwisko
+    p.id
 ORDER BY
-    suma_czasu_lotu_godziny DESC;
+    p.id ASC;
 
 GRANT SELECT ON raporty.raport_miesieczny TO dowodca;
 GRANT SELECT ON raporty.raport_miesieczny TO kierownik;
@@ -634,8 +639,9 @@ BEGIN
         raporty.loty l ON p.id IN (l.pilot1, l.pilot2)
             AND EXTRACT(MONTH FROM l.godzina_ladowania) = miesiac
             AND EXTRACT(YEAR FROM l.godzina_ladowania) = rok
+            AND p.data_zakonczenia IS NULL
     WHERE
-        (l.godzina_ladowania IS NULL OR p.data_zakonczenia IS NULL)
+        p.data_zakonczenia IS NULL
     GROUP BY
         p.id
     ORDER BY
@@ -645,6 +651,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+--EXTRACT(YEAR FROM CURRENT_DATE))
 -- raport roczny dla jednostki
 
 CREATE OR REPLACE FUNCTION raporty.generuj_raport_roczny(rok INTEGER)
