@@ -368,17 +368,17 @@ MariaDB [jednostka]> select * from raport_miesieczny;
 8 rows in set (0.004 sec)
 
 MariaDB [jednostka]> select * from raport_roczny;
-+-----------+---------------------+-------------------------+
-| id_pilota | pilot               | suma_czasu_lotu_godziny |
-+-----------+---------------------+-------------------------+
-|         5 | Grzegorz Jaworski   |                119.0000 |
-|         7 | Andrzej Nowak       |                107.7500 |
-|         3 | Remigiusz Stępień   |                 48.7500 |
-|         4 | Franciszek Sikorski |                 45.0000 |
-|         2 | Max Wojciechowski   |                 12.0000 |
-|         1 | Jan Kowalski        |                 11.2500 |
-|         8 | Patryk Guba         |                  0.0000 |
-+-----------+---------------------+-------------------------+
++-----------+---------------------+-----------------+
+| id_pilota | pilot               | suma_czasu_lotu |
++-----------+---------------------+-----------------+
+|         1 | Jan Kowalski        | 11 godz 15 min  |
+|         2 | Max Wojciechowski   | 12 godz 0 min   |
+|         3 | Remigiusz Stępień   | 49 godz 45 min  |
+|         4 | Franciszek Sikorski | 45 godz 0 min   |
+|         5 | Grzegorz Jaworski   | 20 godz 0 min   |
+|         7 | Andrzej Nowak       | 9 godz 45 min   |
+|         8 | Patryk Guba         | 0 godz 0 min    |
++-----------+---------------------+-----------------+
 7 rows in set (0.002 sec)
 */
 

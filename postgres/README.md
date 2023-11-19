@@ -58,6 +58,7 @@ Nastepnie uruchamiamy crontab -e i wprowadzamy następujący grafik:
 ```
 
 Test zmian w raportach - dodajemy jakieś loty:
+```
 INSERT INTO raporty.loty (pilot1, pilot2, rejestracja, kategoria, lotnisko_wylotu, lotnisko_przylotu, godzina_wylotu, godzina_ladowania) VALUES (5,6, 'SP-SRS', 'IFR', 'WAW', 'KRK', '2023-11-04 02:00:00', '2023-11-04 15:00:00');
 
 
@@ -83,5 +84,4 @@ INSERT INTO raporty.loty (pilot1, pilot2, rejestracja, kategoria, lotnisko_wylot
          8 | Patryk Guba         | 0 godz 0 min
 (7 rows)
 
-root@f05b7a892a0f:/tmp# ls
-raport2023-11-16.txt
+```
